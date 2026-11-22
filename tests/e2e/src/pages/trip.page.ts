@@ -10,15 +10,14 @@ import { RecommendationsComponent } from "@_src/components/recommendations.compo
 import { SectionTabsComponent } from "@_src/components/section-tabs.component";
 import { TransportSectionComponent } from "@_src/components/transport-section.component";
 import { TripAlbumComponent } from "@_src/components/trip-album.component";
-import { TripDetailsModel } from "@_src/models/trip-details.model";
 import { BasePage } from "@_src/pages/base.page";
 import { MyTripsPage } from "@_src/pages/my-trips.page";
 import { TripFormPage } from "@_src/pages/trip-form.page";
 import { step } from "@_src/utils/step.decorator";
-import { parseTripCardData } from "@_src/utils/trip.util";
 import { DeleteTripDialogView } from "@_src/views/delete-trip-dialog.view";
 import { Locator, Page } from "@playwright/test";
 
+// Adres szczegółów zależy od id podróży, dlatego zamiast goto() używamy gotoTrip(tripId).
 export class TripPage extends BasePage {
   url = "/podroze";
   sectionTabs: SectionTabsComponent;
@@ -36,7 +35,7 @@ export class TripPage extends BasePage {
   album: TripAlbumComponent;
   tripTitle: Locator;
   tripStatus: Locator;
-  tripHeaderDetails: Locator;
+  tripMeta: Locator;
   overviewValues: Locator;
   overviewBudget: Locator;
   backLink: Locator;
@@ -66,7 +65,7 @@ export class TripPage extends BasePage {
     this.album = new TripAlbumComponent(this.page);
     this.tripTitle = this.page.getByTestId("trip-details-title");
     this.tripStatus = this.page.getByTestId("trip-status");
-    this.tripHeaderDetails = this.page.getByTestId("trip-details").getByRole("paragraph").first();
+    this.tripMeta = this.page.getByTestId("trip-details").getByRole("paragraph").first();
     this.overviewValues = this.page.getByRole("definition");
     this.overviewBudget = this.page.getByTestId("trip-budget");
     this.backLink = this.page.getByTestId("link-back");
@@ -75,24 +74,27 @@ export class TripPage extends BasePage {
     this.startTripButton = this.page.getByTestId("btn-status-in-progress");
     this.completeTripButton = this.page.getByTestId("btn-status-completed");
     this.archiveButton = this.page.getByTestId("btn-status-archived");
-    this.revertStatusButton = this.page.getByRole("button", { name: "Cofnij status" });
+    this.revertStatusButton = this.page.getByTestId("btn-status-revert");
     this.readOnlyNotice = this.page.getByTestId("trip-readonly-notice");
     this.loadErrorText = this.page.getByTestId("trip-details-error");
   }
 
-  @step("Odczytaj szczegóły podróży")
-  async getTripDetails(): Promise<TripDetailsModel> {
-    const tripName = (await this.tripTitle.textContent()) ?? "";
-    const status = (await this.tripStatus.textContent()) ?? "";
-    const headerDetails = parseTripCardData((await this.tripHeaderDetails.textContent()) ?? "");
-    const [destination, period, duration, budget] = await this.overviewValues.allTextContents();
+  getUrl(tripId: number): string {
+    return `${this.url}/${tripId}`;
+  }
 
-    return { tripName, status, ...headerDetails, destination, period, duration, budget };
+  getEditUrl(tripId: number): string {
+    return `${this.getUrl(tripId)}/edycja`;
+  }
+
+  @step((tripId: number) => `Otwórz podróż ${tripId}`)
+  async gotoTrip(tripId: number): Promise<void> {
+    await this.page.goto(this.getUrl(tripId));
   }
 
   @step((tripId: number) => `Otwórz adres edycji podróży ${tripId}`)
   async gotoEditForm(tripId: number): Promise<TripFormPage> {
-    await this.goto(`/${tripId}/edycja`);
+    await this.page.goto(this.getEditUrl(tripId));
     return new TripFormPage(this.page);
   }
 

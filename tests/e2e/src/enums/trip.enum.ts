@@ -43,6 +43,21 @@ export enum TripSectionTab {
   Costs = "Kosztorys",
 }
 
+// Końcówki data-testid zakładek: section-tab-{klucz}
+export const TRIP_SECTION_TAB_KEYS: Record<TripSectionTab, string> = {
+  [TripSectionTab.Overview]: "przeglad",
+  [TripSectionTab.Plan]: "plan",
+  [TripSectionTab.Flights]: "loty",
+  [TripSectionTab.Transport]: "transport",
+  [TripSectionTab.Meals]: "posilki",
+  [TripSectionTab.Places]: "noclegi",
+  [TripSectionTab.Expenses]: "wydatki",
+  [TripSectionTab.Wishlist]: "chce-odwiedzic",
+  [TripSectionTab.Packing]: "pakowanie",
+  [TripSectionTab.Diary]: "pamietnik",
+  [TripSectionTab.Costs]: "kosztorys",
+};
+
 export const TRIP_TYPE_LABELS: Record<TripType, string> = {
   [TripType.Domestic]: "Krajowa",
   [TripType.Foreign]: "Zagraniczna",

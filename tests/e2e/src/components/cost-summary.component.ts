@@ -1,4 +1,3 @@
-import { BudgetLevel } from "@_src/enums/budget.enum";
 import { CostSummaryModel } from "@_src/models/cost-summary.model";
 import { TripFormPage } from "@_src/pages/trip-form.page";
 import { step } from "@_src/utils/step.decorator";
@@ -19,16 +18,13 @@ export class CostSummaryComponent {
     this.total = this.page.getByTestId("cost-total");
     this.daily = this.page.getByTestId("cost-daily");
     this.rating = this.page.getByTestId("cost-rating");
+    // Poziom budżetu (no_budget/ok/warning/exceeded) jest w atrybucie data-level – sprawdzamy go toHaveAttribute
     this.budget = this.page.getByTestId("budget");
     this.budgetStatus = this.page.getByTestId("budget-status");
-    this.setBudgetLink = this.budgetStatus.getByRole("link", { name: "Ustaw go w edycji podróży" });
+    this.setBudgetLink = this.page.getByTestId("link-set-budget");
     this.sectionsTable = this.page.getByTestId("cost-sections");
     this.footerCells = this.sectionsTable.getByRole("row").last().getByRole("cell");
     this.recommendations = this.page.getByTestId("recommendations");
-  }
-
-  getBudgetWithLevel(level: BudgetLevel): Locator {
-    return this.budget.and(this.page.locator(`[data-level="${level}"]`));
   }
 
   getSectionRow(section: string): Locator {

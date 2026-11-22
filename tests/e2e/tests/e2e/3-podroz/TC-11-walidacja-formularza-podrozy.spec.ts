@@ -1,3 +1,4 @@
+import { verifyTripListLoaded } from "@_src/assertions/trip-list.assertions";
 import { TripStatusLabel } from "@_src/enums/trip.enum";
 import { prepareTrip } from "@_src/factories/trip.factory";
 import { expect, test } from "@_src/fixtures/merge.fixture";
@@ -10,6 +11,7 @@ test("TC-11 Formularz podróży wskazuje błędne pola i zapisuje podróż po ic
   tripsApi,
   page,
 }) => {
+  // given: Użytkownik jest na liście podróży i ma przygotowane błędne oraz poprawne dane podróży.
   const trip = prepareTrip(foreignTripData);
   const tripWithInvalidData: AddTripModel = { ...trip, end_date: getIsoDateFromToday(25), planned_budget: 0 };
   const validTrip: AddTripModel = { ...trip, end_date: trip.start_date, planned_budget: 2500 };
@@ -28,10 +30,13 @@ test("TC-11 Formularz podróży wskazuje błędne pola i zapisuje podróż po ic
   const expectedLeaveButtonText = "Wyjdź bez zapisania";
 
   tripsApi.addTripToCleanup(validTrip.name);
+  await myTripsPage.goto();
 
+  // when: Użytkownik zapisuje pusty formularz nowej podróży.
   const tripFormPage = await myTripsPage.clickNewTripButton();
   await tripFormPage.clickSaveButton();
 
+  // then: Formularz zostaje otwarty i wskazuje wszystkie wymagane pola.
   await test.step("Zweryfikuj błędy pustego formularza", async () => {
     await expect(page).toHaveURL(tripFormPage.url);
     await expect(tripFormPage.formError).toHaveText(expectedFormError);
@@ -42,54 +47,59 @@ test("TC-11 Formularz podróży wskazuje błędne pola i zapisuje podróż po ic
     await expect(tripFormPage.endDateError).toHaveText(expectedEndDateError);
   });
 
+  // when: Użytkownik wpisuje datę końca przed datą startu i budżet 0.
   await tripFormPage.fillForm(tripWithInvalidData);
   await tripFormPage.clickSaveButton();
 
+  // then: Zostają tylko błędy dat i budżetu.
   await test.step("Zweryfikuj błędy dat i budżetu", async () => {
+    await expect(tripFormPage.endDateError).toHaveText(expectedDateOrderError);
+    await expect(tripFormPage.budgetError).toHaveText(expectedBudgetError);
     await expect(tripFormPage.nameError).toBeHidden();
     await expect(tripFormPage.cityError).toBeHidden();
     await expect(tripFormPage.countryError).toBeHidden();
     await expect(tripFormPage.startDateError).toBeHidden();
-    await expect(tripFormPage.endDateError).toHaveText(expectedDateOrderError);
-    await expect(tripFormPage.budgetError).toHaveText(expectedBudgetError);
   });
 
+  // when: Użytkownik wpisuje tekst zamiast budżetu.
   await tripFormPage.fillBudget("abc");
   await tripFormPage.clickSaveButton();
 
+  // then: Budżet nadal jest oznaczony jako błędny.
   await test.step("Zweryfikuj błąd budżetu z tekstem", async () => {
     await expect(tripFormPage.budgetError).toHaveText(expectedBudgetError);
   });
 
+  // when: Użytkownik poprawia dane i zapisuje formularz.
   myTripsPage = await tripFormPage.createTrip(validTrip);
 
+  // then: Podróż jest zapisana ze statusem „w planie”.
   await test.step("Zweryfikuj zapisaną podróż", async () => {
     await expect(page).toHaveURL(myTripsPage.url);
-    await expect(myTripsPage.newTripButton).toBeVisible();
-    await expect(myTripsPage.loadingText).toBeHidden();
-
-    const card = await myTripsPage.getTripCard(validTrip.name);
-    await expect(card.status).toBe(TripStatusLabel.Planned);
+    await verifyTripListLoaded(myTripsPage);
+    await expect(myTripsPage.getCardStatus(validTrip.name)).toHaveText(TripStatusLabel.Planned);
   });
 
+  // when: Użytkownik zaczyna nową podróż i klika „Anuluj”.
   const abandonedTripFormPage = await myTripsPage.clickNewTripButton();
   await abandonedTripFormPage.fillName(abandonedTripName);
   const leaveDialog = await abandonedTripFormPage.clickCancelButton();
 
+  // then: Aplikacja pyta, czy wyjść bez zapisania.
   await test.step("Zweryfikuj okno wyjścia bez zapisania", async () => {
     await expect(leaveDialog.title).toHaveText(expectedLeaveDialogTitle);
     await expect(leaveDialog.cancelButton).toHaveText(expectedStayButtonText);
     await expect(leaveDialog.confirmButton).toHaveText(expectedLeaveButtonText);
   });
 
+  // when: Użytkownik potwierdza wyjście bez zapisania.
   await leaveDialog.clickConfirmButton();
 
+  // then: Porzucona podróż nie trafia na listę.
   await test.step("Zweryfikuj, że podróż nie została zapisana", async () => {
     await expect(page).toHaveURL(myTripsPage.url);
-    await expect(myTripsPage.newTripButton).toBeVisible();
-    await expect(myTripsPage.loadingText).toBeHidden();
-
-    const tripNames = (await myTripsPage.getAllTripCards()).map((card) => card.tripName);
-    await expect(tripNames).not.toContain(abandonedTripName);
+    await verifyTripListLoaded(myTripsPage);
+    await expect(myTripsPage.getCardByName(validTrip.name)).toBeVisible();
+    await expect(myTripsPage.getCardByName(abandonedTripName)).toHaveCount(0);
   });
 });

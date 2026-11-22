@@ -33,7 +33,7 @@ export default function Layout() {
     <>
       <header className={styles.header}>
         <div className={styles.inner}>
-          <Link to="/podroze" className={styles.logo} onClick={closeMenu}>
+          <Link to="/podroze" className={styles.logo} onClick={closeMenu} data-testid="link-logo">
             Moje podróże
           </Link>
           <button

@@ -11,6 +11,7 @@ test("TC-17 Użytkownik dodaje, edytuje, kopiuje i usuwa loty w podróży zagran
   myTripsPage,
   tripsApi,
 }) => {
+  // given: Użytkownik ma podróż zagraniczną bez lotów, utworzoną przez API.
   const trip = prepareTrip(foreignTripData);
   const day1 = getTripDayDate(trip.start_date, 1);
   const day2 = getTripDayDate(trip.start_date, 2);
@@ -71,16 +72,20 @@ test("TC-17 Użytkownik dodaje, edytuje, kopiuje i usuwa loty w podróży zagran
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { flightsSection } = tripPage;
 
+  // when: Użytkownik otwiera zakładkę „Loty”.
   await tripPage.sectionTabs.clickTab(TripSectionTab.Flights);
 
+  // then: Lista lotów jest pusta.
   await test.step("Zweryfikuj pustą zakładkę lotów", async () => {
     await expect(flightsSection.emptyText).toHaveText(expectedEmptyText);
     await expect(flightsSection.addButton).toBeVisible();
   });
 
+  // when: Użytkownik zapisuje pusty formularz lotu.
   await flightsSection.clickAddButton();
   await flightsSection.clickSaveButton();
 
+  // then: Formularz wskazuje wszystkie wymagane pola i ma pełną listę ocen.
   await test.step("Zweryfikuj błędy pustego formularza i listę ocen", async () => {
     await expect(flightsSection.formError).toHaveText(expectedFormError);
     await expect(flightsSection.flightNumberError).toHaveText(expectedNumberError);
@@ -91,37 +96,45 @@ test("TC-17 Użytkownik dodaje, edytuje, kopiuje i usuwa loty w podróży zagran
     await expect(flightsSection.ratingOptions).toHaveText(expectedRatingOptions);
   });
 
+  // when: Użytkownik wpisuje przylot wcześniejszy niż wylot.
   await flightsSection.fillForm({ ...flight, arrivalAt: `${day1}T07:00` });
   await flightsSection.clickSaveButton();
 
+  // then: Formularz odrzuca przylot przed wylotem.
   await test.step("Zweryfikuj błąd przylotu przed wylotem", async () => {
     await expect(flightsSection.arrivalAtError).toHaveText(expectedArrivalBeforeDepartureError);
   });
 
+  // when: Użytkownik wpisuje przylot ponad 48 godzin po wylocie.
   await flightsSection.fillForm({ ...flight, arrivalAt: `${day3}T09:00` });
   await flightsSection.clickSaveButton();
 
+  // then: Formularz odrzuca zbyt późny przylot.
   await test.step("Zweryfikuj błąd przylotu po ponad 48 godzinach", async () => {
     await expect(flightsSection.arrivalAtError).toHaveText(expectedArrivalTooLateError);
   });
 
+  // when: Użytkownik zapisuje poprawny lot.
   await flightsSection.fillForm(flight);
   await flightsSection.clickSaveButton();
 
+  // then: Lot jest na liście z datami, oceną i kosztem, a suma sekcji jest równa jego kosztowi.
   await test.step("Zweryfikuj dodany lot", async () => {
     const flightItem = flightsSection.getItemByTitle(flightTitle);
 
-    await expect(flightsSection.form).toBeHidden();
     await expect(flightItem).toContainText(flight.flightNumber);
     await expect(flightItem).toContainText(`wylot ${formatTripCardDate(day1)}, 08:00`);
     await expect(flightItem).toContainText(`przylot ${formatTripCardDate(day1)}, 12:30`);
     await expect(flightItem).toContainText(RatingStars.Four);
     await expect(flightItem).toContainText(formatMoney(flightCost));
     await expect(flightsSection.total).toHaveText(formatMoney(flightCost));
+    await expect(flightsSection.form).toBeHidden();
   });
 
+  // when: Użytkownik otwiera edycję lotu.
   await flightsSection.clickEditItemButton(flightTitle);
 
+  // then: Formularz edycji ma wczytane dane lotu.
   await test.step("Zweryfikuj formularz edycji lotu", async () => {
     await expect(flightsSection.formTitle).toHaveText(expectedEditFormTitle);
     await expect(flightsSection.flightNumberInput).toHaveValue(flight.flightNumber);
@@ -133,21 +146,24 @@ test("TC-17 Użytkownik dodaje, edytuje, kopiuje i usuwa loty w podróży zagran
     await expect(flightsSection.ratingSelect).toHaveValue(flight.rating ?? "");
   });
 
+  // when: Użytkownik zmienia wszystkie pola lotu.
   await flightsSection.fillForm(editedFlight);
   await flightsSection.clickSaveButton();
 
+  // then: Na liście jest zmieniony lot zamiast starego.
   await test.step("Zweryfikuj zmieniony lot", async () => {
     const editedFlightItem = flightsSection.getItemByTitle(editedFlightTitle);
 
-    await expect(flightsSection.getItemByTitle(flightTitle)).toBeHidden();
     await expect(editedFlightItem).toContainText(editedFlight.flightNumber);
     await expect(editedFlightItem).toContainText(`wylot ${formatTripCardDate(day2)}, 09:15`);
     await expect(editedFlightItem).toContainText(`przylot ${formatTripCardDate(day2)}, 13:45`);
     await expect(editedFlightItem).toContainText(RatingStars.Three);
     await expect(editedFlightItem).toContainText(formatMoney(editedFlightCost));
     await expect(flightsSection.total).toHaveText(formatMoney(editedFlightCost));
+    await expect(flightsSection.getItemByTitle(flightTitle)).toBeHidden();
   });
 
+  // when: Użytkownik kopiuje lot i zapisuje go jako lot powrotny bez przylotu.
   await flightsSection.clickCopyItemButton(editedFlightTitle);
 
   await test.step("Zweryfikuj formularz kopii lotu", async () => {
@@ -158,12 +174,14 @@ test("TC-17 Użytkownik dodaje, edytuje, kopiuje i usuwa loty w podróży zagran
   await flightsSection.fillForm(returnFlight);
   await flightsSection.clickSaveButton();
 
+  // then: Na liście są dwa loty, a suma obejmuje oba.
   await test.step("Zweryfikuj dwa loty na liście", async () => {
     await expect(flightsSection.items).toHaveCount(2);
-    await expect(flightsSection.getItemByTitle(returnFlightTitle)).not.toContainText("przylot");
     await expect(flightsSection.total).toHaveText(formatMoney(editedFlightCost + returnFlightCost));
+    await expect(flightsSection.getItemByTitle(returnFlightTitle)).not.toContainText("przylot");
   });
 
+  // when: Użytkownik usuwa pierwszy lot.
   const deleteDialog = await flightsSection.clickDeleteItemButton(editedFlightTitle);
 
   await test.step("Zweryfikuj okno usuwania lotu", async () => {
@@ -173,6 +191,7 @@ test("TC-17 Użytkownik dodaje, edytuje, kopiuje i usuwa loty w podróży zagran
 
   await deleteDialog.clickConfirmButton();
 
+  // then: Zostaje tylko lot powrotny, a suma jest równa jego kosztowi.
   await test.step("Zweryfikuj, że został tylko lot powrotny", async () => {
     await expect(flightsSection.items).toHaveCount(1);
     await expect(flightsSection.items).toContainText([returnFlight.flightNumber]);

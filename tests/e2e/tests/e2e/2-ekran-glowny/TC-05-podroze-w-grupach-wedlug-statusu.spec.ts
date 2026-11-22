@@ -1,77 +1,75 @@
-import { StatusTabsComponent } from "@_src/components/status-tabs.component";
+import {
+  verifyOnlyTripsWithStatusInTab,
+  verifyStatusTabsVisible,
+  verifyTripListLoaded,
+} from "@_src/assertions/trip-list.assertions";
 import { StatusTabLabel, TripStatusLabel } from "@_src/enums/trip.enum";
 import { prepareTrip } from "@_src/factories/trip.factory";
 import { expect, test } from "@_src/fixtures/merge.fixture";
 import { TripCardModel } from "@_src/models/trip-card.model";
 import { completedTripData, inProgressTripData, plannedTripData } from "@_src/test-data/trip.data";
 import { getExpectedCardsOrder, getExpectedCountdownForNearestTrip } from "@_src/utils/trip-card.util";
+import { getExpectedStatusTabText } from "@_src/utils/trip.util";
 
-test("TC-05 Podróże wyświetlane są na liście podróży w grupach według statusu @logged", async ({ myTripsPage, tripsApi, page }) => {
+test("TC-05 Podróże wyświetlane są na liście podróży w grupach według statusu @logged", async ({
+  myTripsPage,
+  tripsApi,
+  page,
+}) => {
+  // given: Użytkownik ma podróże w planie, w trakcie i zrealizowaną, utworzone przez API.
   const plannedTrip = prepareTrip(plannedTripData);
   const inProgressTrip = prepareTrip(inProgressTripData);
   const completedTrip = prepareTrip(completedTripData);
   const expectedPageTitle = "Moje podróże";
-
-  const { 
-    statusTabs, 
-    nextTripCountdown, 
-    newTripButton, 
-    loadingText, 
-    tripCardStatuses, 
-    tripCardNames,
-    tripCardDetails } = myTripsPage;
+  const { statusTabs, nextTripCountdown } = myTripsPage;
 
   const plannedTripId = await tripsApi.createTrip(plannedTrip, "planned");
   await tripsApi.createTrip(inProgressTrip, "in_progress");
   await tripsApi.createTrip(completedTrip, "completed");
 
-  await test.step("Przejdź na stronę Moje podróże", async() => {
-    await myTripsPage.goto();
+  // when: Użytkownik otwiera listę „Moje podróże”.
+  await myTripsPage.goto();
+
+  // then: Zakładki mają liczniki, karty są pogrupowane według statusu, a odliczanie wskazuje najbliższą podróż.
+  await test.step("Zweryfikuj załadowanie strony", async () => {
     await expect(page).toHaveTitle(expectedPageTitle);
-    await expect(newTripButton).toBeVisible();
-    await expect(loadingText).toBeHidden();
+    await verifyTripListLoaded(myTripsPage);
   });
 
   const initialTabs = await test.step("Zweryfikuj zakładki i liczniki", async () => {
-    await verifyStatusTabsVisible(statusTabs);
+    await verifyStatusTabsVisible(myTripsPage);
 
     const tabs = await statusTabs.getTabs();
-    const expectedActiveTabText = `${StatusTabLabel.All} ${tabs.all.count}`;
     const sumOfOtherTabs = tabs.planned.count + tabs.inProgress.count + tabs.completed.count + tabs.archived.count;
+    const expectedActiveTabText = getExpectedStatusTabText(StatusTabLabel.All, sumOfOtherTabs);
 
-    await expect(statusTabs.activeTab, `Aktywna zakładka to „${expectedActiveTabText}”`).toHaveText(expectedActiveTabText);
-    await expect(tabs.all.count, "Licznik „Wszystkie” jest sumą pozostałych liczników").toBe(sumOfOtherTabs);
+    await expect(
+      statusTabs.activeTab,
+      `Aktywna zakładka to „Wszystkie”, a jej licznik jest sumą pozostałych: „${expectedActiveTabText}”`,
+    ).toHaveText(expectedActiveTabText);
 
     return tabs;
   });
 
-  const allCards = await myTripsPage.getAllTripCards();
+  let allCards: TripCardModel[] = [];
 
-  await test.step("Zweryfikuj sortowanie kart", async () => {
-    const expectedCardsOrder = getExpectedCardsOrder(allCards);
-    await expect(allCards, "Karty są posortowane według statusu i daty od").toEqual(expectedCardsOrder);
+  await test.step("Zweryfikuj sortowanie kart i dodane podróże", async () => {
+    await expect(async () => {
+      allCards = await myTripsPage.getAllTripCards();
+      expect(allCards, "Karty są posortowane według statusu i daty od").toEqual(getExpectedCardsOrder(allCards));
+    }).toPass();
+
+    await expect(myTripsPage.getCardByName(plannedTrip.name)).toBeVisible();
+    await expect(myTripsPage.getCardByName(inProgressTrip.name)).toBeVisible();
+    await expect(myTripsPage.getCardByName(completedTrip.name)).toBeVisible();
   });
 
-  await test.step("Zweryfikuj widoczność zawartości kart", async () => {
-    for (const status of await tripCardStatuses.all()) {
-      await expect(status).toBeVisible();
-    }
+  await test.step("Zweryfikuj zawartość kart", async () => {
+    const cardsCount = allCards.length;
 
-    for (const name of await tripCardNames.all()) {
-      await expect(name).toBeVisible();
-    }
-
-    for (const details of await tripCardDetails.all()) {
-      await expect(details).toBeVisible();
-    }
-  });
-
-  await test.step("Zweryfikuj, że dodane podróże są na liście", async () => {
-    const tripNames = allCards.map((card) => card.tripName);
-
-    await expect(tripNames).toContain(plannedTrip.name);
-    await expect(tripNames).toContain(inProgressTrip.name);
-    await expect(tripNames).toContain(completedTrip.name);
+    await expect(myTripsPage.tripCardStatuses).toHaveCount(cardsCount);
+    await expect(myTripsPage.tripCardNames).toHaveCount(cardsCount);
+    await expect(myTripsPage.tripCardDetails).toHaveCount(cardsCount);
   });
 
   await test.step("Zweryfikuj widget najbliższej podróży", async () => {
@@ -80,79 +78,80 @@ test("TC-05 Podróże wyświetlane są na liście podróży w grupach według st
     await expect(nextTripCountdown, `Odliczanie zawiera „${expectedCountdown}”`).toContainText(expectedCountdown);
   });
 
+  // when: Użytkownik przełącza kolejno zakładki statusów.
   await statusTabs.clickPlannedTab();
-  const plannedCards = await myTripsPage.getAllTripCards();
+
+  // then: Każda zakładka pokazuje tylko podróże o swoim statusie, w liczbie zgodnej z licznikiem.
   await test.step("Zweryfikuj zakładkę W planie", async () => {
-    await verifyCardsInTab(plannedCards, TripStatusLabel.Planned, initialTabs.planned.count, plannedTrip.name);
+    await verifyOnlyTripsWithStatusInTab(myTripsPage, TripStatusLabel.Planned, initialTabs.planned.count, plannedTrip.name);
   });
 
   await statusTabs.clickInProgressTab();
-  const inProgressCards = await myTripsPage.getAllTripCards();
+
   await test.step("Zweryfikuj zakładkę W trakcie", async () => {
-    await verifyCardsInTab(inProgressCards, TripStatusLabel.InProgress, initialTabs.inProgress.count, inProgressTrip.name);
+    await verifyOnlyTripsWithStatusInTab(
+      myTripsPage,
+      TripStatusLabel.InProgress,
+      initialTabs.inProgress.count,
+      inProgressTrip.name,
+    );
   });
 
   await statusTabs.clickCompletedTab();
-  const completedCards = await myTripsPage.getAllTripCards();
+
   await test.step("Zweryfikuj zakładkę Zrealizowane", async () => {
-    await verifyCardsInTab(completedCards, TripStatusLabel.Completed, initialTabs.completed.count, completedTrip.name);
+    await verifyOnlyTripsWithStatusInTab(
+      myTripsPage,
+      TripStatusLabel.Completed,
+      initialTabs.completed.count,
+      completedTrip.name,
+    );
   });
 
-  await test.step("Przenieś podróż do archiwum i wróć na listę", async () => {
-    const completedTripPage = await myTripsPage.clickTripCard(completedTrip.name);
-    await completedTripPage.clickArchiveButton();
+  // when: Użytkownik przenosi zrealizowaną podróż do archiwum i wraca na listę.
+  const completedTripPage = await myTripsPage.clickTripCard(completedTrip.name);
+  await completedTripPage.clickArchiveButton();
+
+  await test.step("Zweryfikuj przeniesienie do archiwum", async () => {
     await expect(completedTripPage.readOnlyNotice).toBeVisible();
-    myTripsPage = await completedTripPage.clickBackLink();
-    await expect(newTripButton).toBeVisible();
-    await expect(loadingText).toBeHidden();
   });
 
-  const tabsAfterArchive = await statusTabs.getTabs();
+  myTripsPage = await completedTripPage.clickBackLink();
 
+  // then: Licznik „Zrealizowane” maleje o 1, „Archiwum” rośnie o 1, a pozostałe się nie zmieniają.
   await test.step("Zweryfikuj liczniki po przeniesieniu do archiwum", async () => {
-    await expect(tabsAfterArchive.all.count).toBe(initialTabs.all.count);
-    await expect(tabsAfterArchive.planned.count).toBe(initialTabs.planned.count);
-    await expect(tabsAfterArchive.inProgress.count).toBe(initialTabs.inProgress.count);
-    await expect(tabsAfterArchive.completed.count).toBe(initialTabs.completed.count - 1);
-    await expect(tabsAfterArchive.archived.count).toBe(initialTabs.archived.count + 1);
+    await verifyTripListLoaded(myTripsPage);
+    await expect(statusTabs.allTab).toHaveText(getExpectedStatusTabText(StatusTabLabel.All, initialTabs.all.count));
+    await expect(statusTabs.plannedTab).toHaveText(
+      getExpectedStatusTabText(StatusTabLabel.Planned, initialTabs.planned.count),
+    );
+    await expect(statusTabs.inProgressTab).toHaveText(
+      getExpectedStatusTabText(StatusTabLabel.InProgress, initialTabs.inProgress.count),
+    );
+    await expect(statusTabs.completedTab).toHaveText(
+      getExpectedStatusTabText(StatusTabLabel.Completed, initialTabs.completed.count - 1),
+    );
+    await expect(statusTabs.archivedTab).toHaveText(
+      getExpectedStatusTabText(StatusTabLabel.Archived, initialTabs.archived.count + 1),
+    );
   });
 
+  // when: Użytkownik otwiera zakładkę „Archiwum”.
   await statusTabs.clickArchivedTab();
-  const archivedTrip = await myTripsPage.getTripCard(completedTrip.name);
+
+  // then: Przeniesiona podróż jest w archiwum.
   await test.step("Zweryfikuj zakładkę Archiwum", async () => {
-    await expect(archivedTrip.status).toBe(TripStatusLabel.Archived);
+    await expect(myTripsPage.getCardStatus(completedTrip.name)).toHaveText(TripStatusLabel.Archived);
   });
 
+  // when: Użytkownik otwiera kartę podróży w planie.
   await statusTabs.clickPlannedTab();
   const plannedTripPage = await myTripsPage.clickTripCard(plannedTrip.name);
 
+  // then: Otwierają się szczegóły tej podróży.
   await test.step("Zweryfikuj szczegóły podróży", async () => {
-    await expect(page).toHaveURL(`/podroze/${plannedTripId}`);
+    await expect(page).toHaveURL(plannedTripPage.getUrl(plannedTripId));
     await expect(plannedTripPage.tripTitle).toHaveText(plannedTrip.name);
     await expect(plannedTripPage.tripStatus).toHaveText(TripStatusLabel.Planned);
   });
 });
-
-async function verifyStatusTabsVisible(statusTabs: StatusTabsComponent): Promise<void> {
-  await expect(statusTabs.allTab).toBeVisible();
-  await expect(statusTabs.plannedTab).toBeVisible();
-  await expect(statusTabs.inProgressTab).toBeVisible();
-  await expect(statusTabs.completedTab).toBeVisible();
-  await expect(statusTabs.archivedTab).toBeVisible();
-}
-
-async function verifyCardsInTab(
-  cards: TripCardModel[],
-  expectedStatus: TripStatusLabel,
-  expectedCount: number,
-  expectedTripName: string,
-): Promise<void> {
-  const tripNames = cards.map((card) => card.tripName);
-
-  await expect(cards.length, "Liczba kart jest zgodna z licznikiem zakładki").toBe(expectedCount);
-  await expect(tripNames).toContain(expectedTripName);
-
-  for (const card of cards) {
-    await expect(card.status).toBe(expectedStatus);
-  }
-}

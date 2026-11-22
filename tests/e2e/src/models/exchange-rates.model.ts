@@ -7,6 +7,7 @@ export interface ExchangeRateModel {
 }
 
 export interface ExchangeRatesModel {
+  table_no: string;
   effective_date: string;
   rates: ExchangeRateModel[];
 }

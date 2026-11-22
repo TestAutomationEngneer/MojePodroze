@@ -7,7 +7,11 @@ import { domesticTripData } from "@_src/test-data/trip.data";
 import { formatTripCardDate, formatTripDateRange, getTripDayDate } from "@_src/utils/date.util";
 import { formatAmount, formatMoney } from "@_src/utils/money.util";
 
-test("TC-20 Użytkownik dodaje noclegi i atrakcje, a terminy noclegów nie mogą się nakładać @logged", async ({ myTripsPage, tripsApi }) => {
+test("TC-20 Użytkownik dodaje noclegi i atrakcje, a terminy noclegów nie mogą się nakładać @logged", async ({
+  myTripsPage,
+  tripsApi,
+}) => {
+  // given: Użytkownik ma podróż krajową bez noclegów i atrakcji, utworzoną przez API.
   const trip = prepareTrip(domesticTripData);
   const day1 = getTripDayDate(trip.start_date, 1);
   const day2 = getTripDayDate(trip.start_date, 2);
@@ -58,9 +62,11 @@ test("TC-20 Użytkownik dodaje noclegi i atrakcje, a terminy noclegów nie mogą
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { placesSection } = tripPage;
 
+  // when: Użytkownik otwiera formularz nowego noclegu lub atrakcji.
   await tripPage.sectionTabs.clickTab(TripSectionTab.Places);
   await placesSection.clickAddButton();
 
+  // then: Domyślnie wybrany jest nocleg z polami zameldowania i wymeldowania.
   await test.step("Zweryfikuj formularz noclegu", async () => {
     await expect(placesSection.formTitle).toHaveText(expectedNewFormTitle);
     await expect(placesSection.kindSelect).toHaveValue("accommodation");
@@ -68,16 +74,20 @@ test("TC-20 Użytkownik dodaje noclegi i atrakcje, a terminy noclegów nie mogą
     await expect(placesSection.checkOutDateInput).toHaveAccessibleName(expectedCheckOutLabel);
   });
 
+  // when: Użytkownik wpisuje wymeldowanie w dniu zameldowania.
   await placesSection.fillForm({ ...hotel, checkOutDate: day1 });
   await placesSection.clickSaveButton();
 
+  // then: Formularz odrzuca taki termin.
   await test.step("Zweryfikuj błąd wymeldowania w dniu zameldowania", async () => {
     await expect(placesSection.checkOutDateError).toHaveText(expectedCheckOutError);
   });
 
+  // when: Użytkownik zapisuje poprawny nocleg.
   await placesSection.fillForm(hotel);
   await placesSection.clickSaveButton();
 
+  // then: Nocleg jest na liście z terminem, liczbą nocy, oceną i kosztem.
   await test.step("Zweryfikuj dodany nocleg", async () => {
     const hotelItem = placesSection.getItemByTitle(hotel.name);
 
@@ -88,15 +98,19 @@ test("TC-20 Użytkownik dodaje noclegi i atrakcje, a terminy noclegów nie mogą
     await expect(hotelItem).toContainText(formatMoney(hotelCost));
   });
 
+  // when: Użytkownik dodaje drugi nocleg nakładający się na pierwszy.
   await placesSection.addPlace({ ...hostel, date: day3 });
 
+  // then: Formularz odrzuca nakładające się terminy.
   await test.step("Zweryfikuj błąd nakładających się noclegów", async () => {
     await expect(placesSection.dateError).toHaveText(expectedOverlapError);
   });
 
+  // when: Użytkownik ustawia zameldowanie w dniu wymeldowania z hotelu.
   await placesSection.fillForm(hostel);
   await placesSection.clickSaveButton();
 
+  // then: Drugi nocleg zostaje zapisany.
   await test.step("Zweryfikuj nocleg od dnia wymeldowania z hotelu", async () => {
     const hostelItem = placesSection.getItemByTitle(hostel.name);
 
@@ -105,17 +119,21 @@ test("TC-20 Użytkownik dodaje noclegi i atrakcje, a terminy noclegów nie mogą
     await expect(hostelItem).toContainText(expectedNoRating);
   });
 
+  // when: Użytkownik zmienia rodzaj na atrakcję.
   await placesSection.clickAddButton();
   await placesSection.selectKind("attraction");
 
+  // then: Formularz ma jedno pole daty, bez wymeldowania.
   await test.step("Zweryfikuj formularz atrakcji", async () => {
     await expect(placesSection.dateInput).toHaveAccessibleName(expectedAttractionDateLabel);
     await expect(placesSection.checkOutDateInput).toBeHidden();
   });
 
+  // when: Użytkownik zapisuje atrakcję z notatką.
   await placesSection.fillForm(museum);
   await placesSection.clickSaveButton();
 
+  // then: Atrakcja jest na liście, a suma sekcji obejmuje noclegi i atrakcję.
   await test.step("Zweryfikuj dodaną atrakcję i sumę", async () => {
     const museumItem = placesSection.getItemByTitle(museum.name);
 

@@ -1,32 +1,28 @@
+import { verifyTripListLoaded } from "@_src/assertions/trip-list.assertions";
 import { RatingStars } from "@_src/enums/rating.enum";
-import {
-  TRIP_CHARACTER_LABELS,
-  TRIP_TYPE_LABELS,
-  TripCharacterId,
-  TripSectionTab,
-  TripStatusLabel,
-  TripType,
-} from "@_src/enums/trip.enum";
+import { TripCharacterId, TripSectionTab, TripStatusLabel, TripType } from "@_src/enums/trip.enum";
 import { prepareTrip } from "@_src/factories/trip.factory";
 import { expect, test } from "@_src/fixtures/merge.fixture";
 import { FlightFormModel } from "@_src/models/flight-form.model";
 import { MealFormModel } from "@_src/models/meal-form.model";
 import { TransportFormModel } from "@_src/models/transport-form.model";
 import { testPngPhoto } from "@_src/test-data/photo.data";
+import { getExpectedSpentText, getExpectedWithinBudgetStatus } from "@_src/utils/budget.util";
 import {
   getExpectedAlbumDayHeading,
   getIsoDateFromToday,
   getTripDayDate,
   getTripDurationDays,
 } from "@_src/utils/date.util";
-import { getExpectedSpentText, getExpectedWithinBudgetStatus } from "@_src/utils/budget.util";
 import { formatAmount, formatMoney } from "@_src/utils/money.util";
 import { formatAverageRating } from "@_src/utils/rating.util";
+import { getExpectedTripMetaText } from "@_src/utils/trip.util";
 
 test("TC-32 Pełne życie podróży – od utworzenia do kosztorysu w archiwum @logged", async ({
   myTripsPage,
   tripsApi,
 }) => {
+  // given: Użytkownik jest zalogowany i ma przygotowane dane podróży zagranicznej, lotu, przejazdu i posiłku.
   const trip = prepareTrip({
     name: "Lizbona 2027",
     destination_city: "Lizbona",
@@ -79,41 +75,50 @@ test("TC-32 Pełne życie podróży – od utworzenia do kosztorysu w archiwum @
   const expectedReadOnlyNotice = "Podróż jest w archiwum – można ją tylko przeglądać. Aby coś zmienić, cofnij status.";
 
   tripsApi.addTripToCleanup(trip.name);
+  await myTripsPage.goto();
 
-  const tripFormPage = await myTripsPage.clickNewTripButton();
-  myTripsPage = await tripFormPage.createTrip(trip);
-
-  await test.step("Zweryfikuj kartę nowej podróży", async () => {
-    await expect(myTripsPage.newTripButton).toBeVisible();
-    await expect(myTripsPage.loadingText).toBeHidden();
-
-    const plannedCard = await myTripsPage.getTripCard(trip.name);
-    await expect(plannedCard.status).toBe(TripStatusLabel.Planned);
-    await expect(plannedCard.tripType).toBe(TRIP_TYPE_LABELS[TripType.Foreign]);
-    await expect(plannedCard.tripCharacter).toBe(TRIP_CHARACTER_LABELS[TripCharacterId.City]);
+  // when: Użytkownik tworzy podróż przez formularz.
+  await test.step("Utwórz podróż przez formularz", async () => {
+    const tripFormPage = await myTripsPage.clickNewTripButton();
+    myTripsPage = await tripFormPage.createTrip(trip);
   });
 
+  // then: Podróż jest na liście „w planie” z typem i charakterem z formularza.
+  await test.step("Zweryfikuj kartę nowej podróży", async () => {
+    await verifyTripListLoaded(myTripsPage);
+    await expect(myTripsPage.getCardStatus(trip.name)).toHaveText(TripStatusLabel.Planned);
+    await expect(myTripsPage.getCardMeta(trip.name)).toHaveText(getExpectedTripMetaText(trip));
+  });
+
+  // when: Użytkownik dodaje lot, przejazd i posiłek.
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { sectionTabs, flightsSection, transportSection, mealsSection, costSummary } = tripPage;
 
-  await sectionTabs.clickTab(TripSectionTab.Flights);
-  await flightsSection.addFlight(flight);
+  await test.step("Dodaj lot", async () => {
+    await sectionTabs.clickTab(TripSectionTab.Flights);
+    await flightsSection.addFlight(flight);
+  });
 
+  // then: Każda pozycja jest na liście swojej sekcji z sumą sekcji.
   await test.step("Zweryfikuj dodany lot", async () => {
     await expect(flightsSection.getItemByTitle("WAW → LIS")).toBeVisible();
     await expect(flightsSection.total).toHaveText(formatMoney(flightCost));
   });
 
-  await sectionTabs.clickTab(TripSectionTab.Transport);
-  await transportSection.addTransport(taxi);
+  await test.step("Dodaj przejazd", async () => {
+    await sectionTabs.clickTab(TripSectionTab.Transport);
+    await transportSection.addTransport(taxi);
+  });
 
   await test.step("Zweryfikuj dodany przejazd", async () => {
     await expect(transportSection.getItemByTitle("Lotnisko → Hotel")).toContainText(taxi.transportMean);
     await expect(transportSection.total).toHaveText(formatMoney(taxiCost));
   });
 
-  await sectionTabs.clickTab(TripSectionTab.Meals);
-  await mealsSection.addMeal(meal);
+  await test.step("Dodaj posiłek", async () => {
+    await sectionTabs.clickTab(TripSectionTab.Meals);
+    await mealsSection.addMeal(meal);
+  });
 
   await test.step("Zweryfikuj dodany posiłek", async () => {
     await expect(mealsSection.getItemByTitle(meal.dish)).toContainText(meal.restaurant);
@@ -121,6 +126,7 @@ test("TC-32 Pełne życie podróży – od utworzenia do kosztorysu w archiwum @
     await expect(mealsSection.total).toHaveText(formatMoney(mealCost));
   });
 
+  // when: Użytkownik wgrywa zdjęcie do pierwszego dnia w edycji podróży.
   const editTripFormPage = await tripPage.clickEditButton();
 
   await test.step("Zweryfikuj wczytanie formularza edycji", async () => {
@@ -129,6 +135,7 @@ test("TC-32 Pełne życie podróży – od utworzenia do kosztorysu w archiwum @
 
   await editTripFormPage.uploadPhoto(testPngPhoto, day1);
 
+  // then: Zdjęcie jest w albumie w grupie pierwszego dnia.
   await test.step("Zweryfikuj wgranie zdjęcia", async () => {
     await expect(editTripFormPage.photoUploadedText).toHaveText(expectedPhotoUploadedText);
   });
@@ -140,8 +147,10 @@ test("TC-32 Pełne życie podróży – od utworzenia do kosztorysu w archiwum @
     await expect(tripPageWithPhoto.album.getDayPhotos(day1)).toHaveCount(1);
   });
 
+  // when: Użytkownik przeprowadza podróż przez wszystkie statusy aż do archiwum.
   await tripPageWithPhoto.clickStartTripButton();
 
+  // then: Status zmienia się po kolei, a w archiwum podróż jest tylko do odczytu.
   await test.step("Zweryfikuj status W trakcie", async () => {
     await expect(tripPageWithPhoto.tripStatus).toHaveText(TripStatusLabel.InProgress);
   });
@@ -161,17 +170,31 @@ test("TC-32 Pełne życie podróży – od utworzenia do kosztorysu w archiwum @
     await expect(tripPageWithPhoto.deleteButton).toBeHidden();
   });
 
+  // when: Użytkownik otwiera kosztorys zarchiwizowanej podróży.
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Kosztorys sumuje wszystkie pozycje, a sekcje nie pozwalają na zmiany.
   await test.step("Zweryfikuj kosztorys podróży", async () => {
     await expect(costSummary.total).toHaveText(formatMoney(totalCost));
     await expect(costSummary.daily).toHaveText(expectedDailyAverage);
     await expect(costSummary.rating).toHaveText(formatAverageRating([flightRating, taxiRating, mealRating]));
     await expect(costSummary.budget).toContainText(expectedBudgetText);
     await expect(costSummary.budgetStatus).toHaveText(expectedBudgetStatus);
-    await expect(costSummary.getSectionCells("flights")).toHaveText(["1", formatAverageRating([flightRating]), formatMoney(flightCost)]);
-    await expect(costSummary.getSectionCells("transport")).toHaveText(["1", formatAverageRating([taxiRating]), formatMoney(taxiCost)]);
-    await expect(costSummary.getSectionCells("meals")).toHaveText(["1", formatAverageRating([mealRating]), formatMoney(mealCost)]);
+    await expect(costSummary.getSectionCells("flights")).toHaveText([
+      "1",
+      formatAverageRating([flightRating]),
+      formatMoney(flightCost),
+    ]);
+    await expect(costSummary.getSectionCells("transport")).toHaveText([
+      "1",
+      formatAverageRating([taxiRating]),
+      formatMoney(taxiCost),
+    ]);
+    await expect(costSummary.getSectionCells("meals")).toHaveText([
+      "1",
+      formatAverageRating([mealRating]),
+      formatMoney(mealCost),
+    ]);
   });
 
   const readOnlySections = [
@@ -190,18 +213,18 @@ test("TC-32 Pełne życie podróży – od utworzenia do kosztorysu w archiwum @
     });
   }
 
+  // when: Użytkownik wraca na listę i otwiera zakładkę „Archiwum”.
   myTripsPage = await tripPageWithPhoto.clickBackLink();
 
   await test.step("Zweryfikuj powrót na listę podróży", async () => {
-    await expect(myTripsPage.newTripButton).toBeVisible();
-    await expect(myTripsPage.loadingText).toBeHidden();
+    await verifyTripListLoaded(myTripsPage);
   });
 
   await myTripsPage.statusTabs.clickArchivedTab();
-  const archivedCard = await myTripsPage.getTripCard(trip.name);
 
+  // then: Karta podróży ma status „Archiwum” i zdjęcie jako okładkę.
   await test.step("Zweryfikuj kartę podróży w archiwum", async () => {
-    await expect(archivedCard.status).toBe(TripStatusLabel.Archived);
+    await expect(myTripsPage.getCardStatus(trip.name)).toHaveText(TripStatusLabel.Archived);
     await expect(myTripsPage.getCardCoverPhoto(trip.name)).toBeVisible();
   });
 });

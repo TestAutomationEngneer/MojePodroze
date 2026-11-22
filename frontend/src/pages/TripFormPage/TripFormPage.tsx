@@ -291,7 +291,7 @@ export default function TripFormPage() {
       ) : dict.trip?.is_read_only ? (
         <div className={styles.formError} role="alert" data-testid="trip-form-readonly">
           <p>Podróż jest w archiwum – nie można jej edytować. Aby coś zmienić, cofnij jej status.</p>
-          <Link to={backTo} className={styles.backLink}>
+          <Link to={backTo} className={styles.backLink} data-testid="link-back-to-trip">
             Wróć do podróży
           </Link>
         </div>

@@ -11,6 +11,7 @@ import { formatAmount, formatMoney } from "@_src/utils/money.util";
 import { formatAverageRating } from "@_src/utils/rating.util";
 
 test("TC-29 Kosztorys sumuje koszty według sekcji i liczy średnie ocen @logged", async ({ myTripsPage, tripsApi }) => {
+  // given: Użytkownik ma 5-dniową podróż krajową z budżetem i bez kosztów, utworzoną przez API.
   const trip = prepareTrip({
     ...domesticTripData,
     end_date: getTripDayDate(domesticTripData.start_date, 4),
@@ -75,19 +76,22 @@ test("TC-29 Kosztorys sumuje koszty według sekcji i liczy średnie ocen @logged
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { sectionTabs, costSummary, mealsSection, transportSection, expensesSection, placesSection } = tripPage;
 
+  // when: Użytkownik otwiera kosztorys.
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Kosztorys podróży krajowej jest pusty i nie ma wiersza lotów.
   await test.step("Zweryfikuj pusty kosztorys podróży krajowej", async () => {
     await expect(costSummary.total).toHaveText(formatMoney(0));
     await expect(costSummary.rating).toHaveText(expectedNoRatingsText);
-    await expect(costSummary.getSectionRow("flights")).toBeHidden();
     await expect(costSummary.getSectionCells("transport")).toHaveText(expectedEmptySectionCells);
     await expect(costSummary.getSectionCells("meals")).toHaveText(expectedEmptySectionCells);
     await expect(costSummary.getSectionCells("places")).toHaveText(expectedEmptySectionCells);
     await expect(costSummary.getSectionCells("expenses")).toHaveText(expectedEmptyExpensesCells);
     await expect(costSummary.recommendations).toBeVisible();
+    await expect(costSummary.getSectionRow("flights")).toBeHidden();
   });
 
+  // when: Użytkownik dodaje posiłek, przejazd i wydatek inny.
   await sectionTabs.clickTab(TripSectionTab.Meals);
   await mealsSection.addMeal(pretzel);
 
@@ -111,6 +115,7 @@ test("TC-29 Kosztorys sumuje koszty według sekcji i liczy średnie ocen @logged
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Kosztorys sumuje koszty, liczy średnią dzienną i średnią ocen według sekcji.
   await test.step("Zweryfikuj sumę, średnią dzienną i ocenę zbiorczą", async () => {
     await expect(costSummary.total).toHaveText(formatMoney(totalAfterFirstItems));
     await expect(costSummary.daily).toHaveText(expectedDailyAverage);
@@ -137,6 +142,7 @@ test("TC-29 Kosztorys sumuje koszty według sekcji i liczy średnie ocen @logged
     await expect(costSummary.footerCells).toHaveText(["3", "", formatMoney(totalAfterFirstItems)]);
   });
 
+  // when: Użytkownik dodaje darmową atrakcję z oceną i posiłek bez oceny.
   await sectionTabs.clickTab(TripSectionTab.Places);
   await placesSection.addPlace(wawel);
 
@@ -153,6 +159,7 @@ test("TC-29 Kosztorys sumuje koszty według sekcji i liczy średnie ocen @logged
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Pozycja bez oceny zwiększa sumę, ale nie wpływa na średnią ocen.
   await test.step("Zweryfikuj, że pozycja bez oceny nie wpływa na średnią", async () => {
     await expect(costSummary.total).toHaveText(formatMoney(totalAfterAllItems));
     await expect(costSummary.rating).toHaveText(formatAverageRating([pretzelRating, trainRating, wawelRating]));
@@ -168,16 +175,19 @@ test("TC-29 Kosztorys sumuje koszty według sekcji i liczy średnie ocen @logged
     ]);
   });
 
+  // when: Użytkownik usuwa przejazd.
   await sectionTabs.clickTab(TripSectionTab.Transport);
   const deleteDialog = await transportSection.clickDeleteItemButton(trainTitle);
   await deleteDialog.clickConfirmButton();
 
   await test.step(`Zweryfikuj usunięcie pozycji „${trainTitle}”`, async () => {
+    await expect(transportSection.emptyText).toBeVisible();
     await expect(transportSection.getItemByTitle(trainTitle)).toBeHidden();
   });
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Kosztorys nie liczy już kosztu ani oceny przejazdu.
   await test.step("Zweryfikuj kosztorys po usunięciu przejazdu", async () => {
     await expect(costSummary.total).toHaveText(formatMoney(totalAfterDeletingTrain));
     await expect(costSummary.getSectionCells("transport")).toHaveText(expectedEmptySectionCells);

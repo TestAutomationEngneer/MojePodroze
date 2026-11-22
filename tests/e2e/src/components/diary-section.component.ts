@@ -38,7 +38,7 @@ export class DiarySectionComponent extends ItemSectionComponent {
 
   @step((isoDate: string) => `Edytuj wpis pamiętnika z dnia ${isoDate}`)
   async editDiaryEntryInDay(isoDate: string, entry: DiaryEntryFormModel): Promise<void> {
-    await this.getDayGroup(isoDate).getByRole("button", { name: "Edytuj" }).click();
+    await this.getDayGroup(isoDate).getByTestId(/^btn-edit-/).click();
     await this.fillForm(entry);
     await this.saveButton.click();
   }

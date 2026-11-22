@@ -13,8 +13,8 @@ export class StatusTabsComponent {
   activeTab: Locator;
 
   constructor(private page: Page) {
-    this.tabs = this.page.getByRole("tablist", { name: "Status podróży" }).getByRole("tab");
-    this.activeTab = this.page.getByRole("tablist", { name: "Status podróży" }).getByRole("tab", { selected: true });
+    this.tabs = this.page.getByTestId(/^status-tab-/);
+    this.activeTab = this.tabs.and(this.page.getByRole("tab", { selected: true }));
     this.allTab = this.page.getByTestId("status-tab-all");
     this.plannedTab = this.page.getByTestId("status-tab-planned");
     this.inProgressTab = this.page.getByTestId("status-tab-in-progress");
@@ -22,6 +22,19 @@ export class StatusTabsComponent {
     this.archivedTab = this.page.getByTestId("status-tab-archived");
   }
 
+  getTabForStatus(status: TripStatusLabel): Locator {
+    const tabsByStatus: Record<TripStatusLabel, Locator> = {
+      [TripStatusLabel.Planned]: this.plannedTab,
+      [TripStatusLabel.InProgress]: this.inProgressTab,
+      [TripStatusLabel.Completed]: this.completedTab,
+      [TripStatusLabel.Archived]: this.archivedTab,
+    };
+
+    return tabsByStatus[status];
+  }
+
+  // Odczyt liczników jako punkt odniesienia (np. przed dodaniem podróży). Zmiany po akcji sprawdzamy
+  // asercją z ponawianiem na lokatorze zakładki, np. toHaveText(getExpectedStatusTabText(...)).
   @step("Odczytaj nazwy i liczniki zakładek statusów")
   async getTabs(): Promise<StatusTabsModel> {
     return {
@@ -43,14 +56,7 @@ export class StatusTabsComponent {
 
   @step((status: TripStatusLabel) => `Wybierz zakładkę ze statusem „${status}”`)
   async clickTabForStatus(status: TripStatusLabel): Promise<void> {
-    const tabsByStatus: Record<TripStatusLabel, Locator> = {
-      [TripStatusLabel.Planned]: this.plannedTab,
-      [TripStatusLabel.InProgress]: this.inProgressTab,
-      [TripStatusLabel.Completed]: this.completedTab,
-      [TripStatusLabel.Archived]: this.archivedTab,
-    };
-
-    await tabsByStatus[status].click();
+    await this.getTabForStatus(status).click();
   }
 
   @step("Wybierz zakładkę „Wszystkie”")

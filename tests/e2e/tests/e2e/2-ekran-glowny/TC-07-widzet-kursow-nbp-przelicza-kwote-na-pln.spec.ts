@@ -1,6 +1,7 @@
 import { CurrencyCode } from "@_src/enums/currency.enum";
 import { TripStatusLabel } from "@_src/enums/trip.enum";
 import { expect, test } from "@_src/fixtures/merge.fixture";
+import { mockedExchangeRates } from "@_src/test-data/widgets.data";
 import {
   findRate,
   formatRate,
@@ -10,7 +11,8 @@ import {
 } from "@_src/utils/exchange-rate.util";
 import { formatAmount } from "@_src/utils/money.util";
 
-test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged", async ({ myTripsPage, widgetsApi }) => {
+test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged", async ({ myTripsPage, widgetsMock }) => {
+  // given: Kursy NBP mają stałe wartości z danych testowych.
   const defaultAmount = 100;
   const amount = 12.5;
   const invalidAmounts = ["-5", "abc", "1,234"];
@@ -21,16 +23,15 @@ test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged
     TripStatusLabel.Archived,
   ];
 
-  const exchangeRates = await widgetsApi.getExchangeRates();
-  const euroRate = findRate(exchangeRates, CurrencyCode.EUR);
-  const dollarRate = findRate(exchangeRates, CurrencyCode.USD);
-  const poundRate = findRate(exchangeRates, CurrencyCode.GBP);
+  const euroRate = findRate(mockedExchangeRates, CurrencyCode.EUR);
+  const dollarRate = findRate(mockedExchangeRates, CurrencyCode.USD);
+  const poundRate = findRate(mockedExchangeRates, CurrencyCode.GBP);
 
   const expectedEuroButton = getExpectedRateButtonText(euroRate);
   const expectedDollarButton = getExpectedRateButtonText(dollarRate);
   const expectedPoundButton = getExpectedRateButtonText(poundRate);
   const expectedRateButtons = [expectedEuroButton, expectedDollarButton, expectedPoundButton];
-  const expectedRatesDate = getExpectedRatesDateText(exchangeRates);
+  const expectedRatesDate = getExpectedRatesDateText(mockedExchangeRates);
   const expectedEuroAmountLabel = `Kwota w ${euroRate.code}`;
   const expectedDollarAmountLabel = `Kwota w ${dollarRate.code}`;
   const expectedDefaultAmountInEuro = getExpectedConversionText(defaultAmount, euroRate);
@@ -40,15 +41,17 @@ test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged
   const expectedDefaultAmountInPounds = getExpectedConversionText(defaultAmount, poundRate);
   const expectedAmountError = "Podaj kwotę, np. 100 albo 12,50.";
   const expectedEmptyResult = "= –";
-
-  await myTripsPage.goto();
   const { ratesWidget } = myTripsPage;
 
+  await widgetsMock.mockExchangeRates(mockedExchangeRates);
+
+  // when: Użytkownik otwiera stronę „Moje podróże”.
+  await myTripsPage.goto();
+
+  // then: Widżet pokazuje kursy z tabeli NBP i domyślnie przelicza 100 EUR.
   await test.step("Zweryfikuj kursy i datę tabeli NBP", async () => {
-    await expect(ratesWidget.rateButtons, "Kursy na przyciskach powinny być takie jak z API NBP").toHaveText(
-      expectedRateButtons,
-    );
-    await expect(ratesWidget.ratesDate, "Data tabeli powinna być taka jak z API NBP").toHaveText(expectedRatesDate);
+    await expect(ratesWidget.rateButtons).toHaveText(expectedRateButtons);
+    await expect(ratesWidget.ratesDate).toHaveText(expectedRatesDate);
   });
 
   await test.step("Zweryfikuj domyślne ustawienia kalkulatora", async () => {
@@ -63,8 +66,10 @@ test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged
     ).toHaveText(expectedDefaultAmountInEuro);
   });
 
+  // when: Użytkownik wybiera walutę USD.
   await ratesWidget.clickRateButton(dollarRate.code);
 
+  // then: Kalkulator przelicza kwotę po kursie USD.
   await test.step(`Zweryfikuj przeliczenie kwoty ${defaultAmount} po kursie ${dollarRate.code}`, async () => {
     await expect(ratesWidget.selectedRateButton, `Zaznaczona powinna być waluta ${dollarRate.code}`).toHaveText(
       expectedDollarButton,
@@ -76,8 +81,10 @@ test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged
     ).toHaveText(expectedDefaultAmountInDollars);
   });
 
+  // when: Użytkownik wpisuje kwotę z groszami.
   await ratesWidget.fillAmount(formatAmount(amount));
 
+  // then: Wynik jest zaokrąglony do groszy.
   await test.step(`Zweryfikuj przeliczenie kwoty ${formatAmount(amount)} po kursie ${dollarRate.code}`, async () => {
     await expect(
       ratesWidget.convertResult,
@@ -85,8 +92,10 @@ test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged
     ).toHaveText(expectedAmountInDollars);
   });
 
+  // when: Użytkownik zmienia walutę na GBP.
   await ratesWidget.clickRateButton(poundRate.code);
 
+  // then: Ta sama kwota jest przeliczona po kursie GBP.
   await test.step(`Zweryfikuj przeliczenie kwoty ${formatAmount(amount)} po kursie ${poundRate.code}`, async () => {
     await expect(ratesWidget.selectedRateButton, `Zaznaczona powinna być waluta ${poundRate.code}`).toHaveText(
       expectedPoundButton,
@@ -97,33 +106,37 @@ test("TC-07 Widżet kursów NBP pokazuje kursy i przelicza kwotę na PLN @logged
     ).toHaveText(expectedAmountInPounds);
   });
 
+  // when: Użytkownik wpisuje kolejno błędne kwoty.
   for (const invalidAmount of invalidAmounts) {
     await ratesWidget.fillAmount(invalidAmount);
 
+    // then: Kalkulator pokazuje błąd i nie podaje wyniku.
     await test.step(`Zweryfikuj błąd dla kwoty „${invalidAmount}”`, async () => {
       await expect(ratesWidget.amountError).toHaveText(expectedAmountError);
       await expect(ratesWidget.convertResult).toHaveText(expectedEmptyResult);
     });
   }
 
+  // when: Użytkownik poprawia kwotę.
   await ratesWidget.fillAmount(String(defaultAmount));
 
+  // then: Błąd znika, a wynik jest znowu przeliczony.
   await test.step("Zweryfikuj przeliczenie po poprawieniu kwoty", async () => {
-    await expect(ratesWidget.amountError).toBeHidden();
     await expect(
       ratesWidget.convertResult,
       `Wynik powinien być równy ${defaultAmount} × ${formatRate(poundRate.mid)} (kurs ${poundRate.code})`,
     ).toHaveText(expectedDefaultAmountInPounds);
+    await expect(ratesWidget.amountError).toBeHidden();
   });
 
+  // when: Użytkownik przełącza zakładki statusów podróży.
   for (const status of statusTabs) {
     await myTripsPage.statusTabs.clickTabForStatus(status);
 
+    // then: Widżet kursów jest widoczny niezależnie od zakładki.
     await test.step(`Zweryfikuj widżet kursów w zakładce „${status}”`, async () => {
-      await expect(ratesWidget.rateButtons, "Kursy na przyciskach powinny być takie jak z API NBP").toHaveText(
-        expectedRateButtons,
-      );
-      await expect(ratesWidget.ratesDate, "Data tabeli powinna być taka jak z API NBP").toHaveText(expectedRatesDate);
+      await expect(ratesWidget.rateButtons).toHaveText(expectedRateButtons);
+      await expect(ratesWidget.ratesDate).toHaveText(expectedRatesDate);
     });
   }
 });

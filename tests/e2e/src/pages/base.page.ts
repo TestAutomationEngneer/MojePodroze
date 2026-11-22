@@ -9,21 +9,12 @@ export class BasePage {
   }
 
   @step()
-  async goto(parameters = ""): Promise<void> {
-    await this.page.goto(`${this.url}${parameters}`);
+  async goto(): Promise<void> {
+    await this.page.goto(this.url);
   }
 
   @step("Odśwież stronę")
   async reload(): Promise<void> {
     await this.page.reload();
-  }
-
-  async getTitle(): Promise<string> {
-    await this.page.waitForLoadState();
-    return this.page.title();
-  }
-
-  async waitForPageToLoadUrl(): Promise<void> {
-    await this.page.waitForURL(this.url);
   }
 }

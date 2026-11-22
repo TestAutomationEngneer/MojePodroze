@@ -15,6 +15,7 @@ export class ChecklistSectionComponent {
   items: Locator;
   checkboxes: Locator;
   editNameInput: Locator;
+  editSaveButton: Locator;
 
   constructor(
     private page: Page,
@@ -32,6 +33,8 @@ export class ChecklistSectionComponent {
     this.items = this.page.getByTestId(`${itemTestId}-list`).getByRole("listitem");
     this.checkboxes = this.section.getByRole("checkbox");
     this.editNameInput = this.page.getByTestId(`input-edit-${itemTestId}-name`);
+    // W trybie edycji zawsze jest otwarta najwyżej jedna pozycja: btn-save-{single}-{id}
+    this.editSaveButton = this.items.getByTestId(new RegExp(`^btn-save-${itemTestId}-`));
   }
 
   getItemByName(name: string): Locator {
@@ -65,14 +68,14 @@ export class ChecklistSectionComponent {
 
   @step((name: string, newName: string) => `Zmień nazwę „${name}” na „${newName}”`)
   async editItemName(name: string, newName: string): Promise<void> {
-    await this.getItemByName(name).getByRole("button", { name: "Edytuj" }).click();
+    await this.getItemByName(name).getByTestId(/^btn-edit-/).click();
     await this.editNameInput.fill(newName);
-    await this.section.getByRole("button", { name: "Zapisz" }).click();
+    await this.editSaveButton.click();
   }
 
   @step((name: string) => `Kliknij „Usuń” przy „${name}”`)
   async clickDeleteItemButton(name: string): Promise<ConfirmDialogView> {
-    await this.getItemByName(name).getByRole("button", { name: "Usuń" }).click();
+    await this.getItemByName(name).getByTestId(/^btn-delete-/).click();
     return new ConfirmDialogView(this.page);
   }
 }

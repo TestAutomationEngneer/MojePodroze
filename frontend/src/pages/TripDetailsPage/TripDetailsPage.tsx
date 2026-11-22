@@ -287,7 +287,7 @@ export default function TripDetailsPage() {
                   onClick={() => changeStatus(status)}
                   disabled={changing}
                   aria-label={forward ? undefined : `Cofnij status do „${STATUS_LABEL[status]}”`}
-                  data-testid={`btn-status-${status.replace("_", "-")}`}
+                  data-testid={forward ? `btn-status-${status.replace("_", "-")}` : "btn-status-revert"}
                 >
                   {forward ? FORWARD_LABEL[status] : "Cofnij"}
                 </button>
