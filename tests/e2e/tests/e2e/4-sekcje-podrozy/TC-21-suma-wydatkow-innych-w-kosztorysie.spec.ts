@@ -11,6 +11,7 @@ test("TC-21 Po dodaniu wydatków i innych, suma wydatków jest widoczna w koszto
   myTripsPage,
   tripsApi,
 }) => {
+  // given: Użytkownik ma podróż krajową bez wydatków, utworzoną przez API.
   const trip = prepareTrip(domesticTripData);
   const insuranceCost = 89.99;
   const magnetCost = 15;
@@ -40,9 +41,11 @@ test("TC-21 Po dodaniu wydatków i innych, suma wydatków jest widoczna w koszto
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { expensesSection } = tripPage;
 
+  // when: Użytkownik otwiera formularz nowego wydatku.
   await tripPage.sectionTabs.clickTab(TripSectionTab.Expenses);
   await expensesSection.clickAddButton();
 
+  // then: Formularz ma listę kategorii, puste pole daty i nie ma oceny.
   await test.step("Zweryfikuj formularz wydatku bez oceny", async () => {
     await expect(expensesSection.formTitle).toHaveText(expectedNewFormTitle);
     await expect(expensesSection.categoryOptions).toHaveText(expectedCategories);
@@ -50,17 +53,21 @@ test("TC-21 Po dodaniu wydatków i innych, suma wydatków jest widoczna w koszto
     await expect(expensesSection.formSelects).toHaveCount(1);
   });
 
+  // when: Użytkownik zapisuje pusty formularz.
   await expensesSection.clickSaveButton();
 
+  // then: Formularz wskazuje brak opisu i kosztu.
   await test.step("Zweryfikuj błędy pustego formularza", async () => {
     await expect(expensesSection.formError).toHaveText(expectedFormError);
     await expect(expensesSection.descriptionError).toHaveText(expectedDescriptionError);
     await expect(expensesSection.costError).toHaveText(expectedCostError);
   });
 
+  // when: Użytkownik zapisuje wydatek z datą sprzed podróży.
   await expensesSection.fillForm(insurance);
   await expensesSection.clickSaveButton();
 
+  // then: Wydatek jest na liście z kategorią, datą i kosztem, bez oceny.
   await test.step("Zweryfikuj wydatek z datą sprzed podróży", async () => {
     const insuranceItem = expensesSection.getItemByTitle(insurance.description);
 
@@ -70,8 +77,10 @@ test("TC-21 Po dodaniu wydatków i innych, suma wydatków jest widoczna w koszto
     await expect(insuranceItem).not.toContainText(RATING_STAR);
   });
 
+  // when: Użytkownik dodaje wydatek bez daty.
   await expensesSection.addExpense(magnet);
 
+  // then: Wydatek ma etykietę „bez daty”, a suma obejmuje oba wydatki.
   await test.step("Zweryfikuj wydatek bez daty i sumę", async () => {
     const magnetItem = expensesSection.getItemByTitle(magnet.description);
 
@@ -81,8 +90,10 @@ test("TC-21 Po dodaniu wydatków i innych, suma wydatków jest widoczna w koszto
     await expect(expensesSection.total).toHaveText(formatMoney(expensesTotal));
   });
 
+  // when: Użytkownik otwiera kosztorys.
   await tripPage.sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Kosztorys pokazuje liczbę i sumę wydatków innych.
   await test.step("Zweryfikuj wydatki w kosztorysie", async () => {
     await expect(tripPage.costSummary.getSectionCells("expenses")).toHaveText(expectedCostSummaryCells);
   });

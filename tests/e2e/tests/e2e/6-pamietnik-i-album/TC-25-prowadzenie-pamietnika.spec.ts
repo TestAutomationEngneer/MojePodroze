@@ -5,7 +5,11 @@ import { DiaryEntryFormModel } from "@_src/models/diary-entry-form.model";
 import { domesticTripData } from "@_src/test-data/trip.data";
 import { formatTripCardDate, getExpectedDayHeading, getTripDayDate } from "@_src/utils/date.util";
 
-test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni @logged", async ({ myTripsPage, tripsApi }) => {
+test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni @logged", async ({
+  myTripsPage,
+  tripsApi,
+}) => {
+  // given: Użytkownik ma podróż krajową z pustym pamiętnikiem, utworzoną przez API.
   const trip = prepareTrip(domesticTripData);
   const day1 = getTripDayDate(trip.start_date, 1);
   const day2 = getTripDayDate(trip.start_date, 2);
@@ -18,9 +22,9 @@ test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni 
     title: walkTitle,
     content: `${morningLine}\n${afternoonLine}`,
   };
-  const arrivalEntry: DiaryEntryFormModel = { 
-    date: day1, 
-    content: "Przyjazd pociągiem, wieczorem molo." 
+  const arrivalEntry: DiaryEntryFormModel = {
+    date: day1,
+    content: "Przyjazd pociągiem, wieczorem molo.",
   };
   const arrivalTitle = "Przyjazd";
   const cruiseEntry: DiaryEntryFormModel = {
@@ -41,13 +45,16 @@ test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni 
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { diarySection } = tripPage;
 
+  // when: Użytkownik otwiera zakładkę „Pamiętnik”.
   await tripPage.sectionTabs.clickTab(TripSectionTab.Diary);
 
+  // then: Pamiętnik jest pusty.
   await test.step("Zweryfikuj pusty pamiętnik", async () => {
     await expect(diarySection.emptyText).toHaveText(expectedEmptyText);
     await expect(diarySection.addButton).toBeVisible();
   });
 
+  // when: Użytkownik otwiera formularz wpisu i zapisuje go bez treści.
   await diarySection.clickAddButton();
 
   await test.step("Zweryfikuj formularz nowego wpisu", async () => {
@@ -59,14 +66,17 @@ test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni 
 
   await diarySection.clickSaveButton();
 
+  // then: Formularz wymaga treści wpisu.
   await test.step("Zweryfikuj błąd pustej treści", async () => {
     await expect(diarySection.formError).toHaveText(expectedFormError);
     await expect(diarySection.contentError).toHaveText(expectedContentError);
   });
 
+  // when: Użytkownik zapisuje wpis z dnia 2 z treścią w dwóch liniach.
   await diarySection.fillForm(walkEntry);
   await diarySection.clickSaveButton();
 
+  // then: Wpis jest w grupie dnia 2 z obiema liniami treści.
   await test.step("Zweryfikuj wpis w grupie dnia 2", async () => {
     const day2Group = diarySection.getDayGroup(day2);
 
@@ -76,6 +86,7 @@ test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni 
     await expect(day2Group).toContainText(afternoonLine);
   });
 
+  // when: Użytkownik dodaje wpisy z dnia 3 i dnia 1 (bez tytułu).
   await diarySection.addDiaryEntry(cruiseEntry);
 
   await test.step("Zweryfikuj wpis w grupie dnia 3", async () => {
@@ -85,6 +96,7 @@ test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni 
 
   await diarySection.addDiaryEntry(arrivalEntry);
 
+  // then: Dni są ułożone chronologicznie, a wpis bez tytułu też jest widoczny.
   await test.step("Zweryfikuj kolejność dni i wpis bez tytułu", async () => {
     await expect(diarySection.dayHeadings).toHaveText([
       getExpectedDayHeading(1, day1),
@@ -94,12 +106,15 @@ test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni 
     await expect(diarySection.getDayGroup(day1)).toContainText(arrivalEntry.content);
   });
 
+  // when: Użytkownik dopisuje tytuł do wpisu przy edycji.
   await diarySection.editDiaryEntryInDay(day1, { ...arrivalEntry, title: arrivalTitle });
 
+  // then: Wpis ma nowy tytuł.
   await test.step("Zweryfikuj tytuł dopisany przy edycji", async () => {
     await expect(diarySection.getItemByTitle(arrivalTitle)).toBeVisible();
   });
 
+  // when: Użytkownik usuwa jedyny wpis z dnia 2.
   const deleteDialog = await diarySection.clickDeleteItemButton(walkTitle);
 
   await test.step("Zweryfikuj okno usuwania wpisu", async () => {
@@ -109,9 +124,10 @@ test("TC-25 Użytkownik prowadzi pamiętnik – wpisy grupują się według dni 
 
   await deleteDialog.clickConfirmButton();
 
+  // then: Znika cała grupa dnia 2, pozostałe wpisy zostają.
   await test.step("Zweryfikuj usunięcie wpisu i grupy dnia 2", async () => {
-    await expect(diarySection.getDayGroup(day2)).toBeHidden();
     await expect(diarySection.dayHeadings).toHaveText([getExpectedDayHeading(1, day1), getExpectedDayHeading(3, day3)]);
     await expect(diarySection.getItemByTitle(arrivalTitle)).toBeVisible();
+    await expect(diarySection.getDayGroup(day2)).toBeHidden();
   });
 });

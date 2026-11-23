@@ -15,6 +15,7 @@ import {
 import { formatAmount, formatMoney } from "@_src/utils/money.util";
 
 test("TC-30 Status budżetu zmienia się w progach 90% i 100% @logged", async ({ myTripsPage, tripsApi }) => {
+  // given: Użytkownik ma podróż z budżetem 1000 zł i posiłkiem za 799 zł, utworzoną przez API.
   const budget = 1000;
   const mealCost = 799;
   const ticketCostBelowWarning = 100;
@@ -41,6 +42,7 @@ test("TC-30 Status budżetu zmienia się w progach 90% i 100% @logged", async ({
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { sectionTabs, costSummary, expensesSection } = tripPage;
 
+  // when: Użytkownik dodaje wydatek, po którym wydano 89,9% budżetu.
   await sectionTabs.clickTab(TripSectionTab.Expenses);
   await expensesSection.addExpense(ticket);
 
@@ -50,14 +52,16 @@ test("TC-30 Status budżetu zmienia się w progach 90% i 100% @logged", async ({
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Budżet ma status „ok”.
   await test.step("Zweryfikuj budżet poniżej 90%", async () => {
     await expect(costSummary.budget).toContainText(
       `${getExpectedSpentText(spentBelowWarning, budget)} (${formatBudgetPercent(spentBelowWarning, budget)}%)`,
     );
     await expect(costSummary.budgetStatus).toHaveText(getExpectedWithinBudgetStatus(spentBelowWarning, budget));
-    await expect(costSummary.getBudgetWithLevel(BudgetLevel.Ok)).toBeVisible();
+    await expect(costSummary.budget).toHaveAttribute("data-level", BudgetLevel.Ok);
   });
 
+  // when: Użytkownik zmienia wydatek tak, że wydano dokładnie 90% budżetu.
   await sectionTabs.clickTab(TripSectionTab.Expenses);
   await expensesSection.editExpense(ticket.description, { ...ticket, cost: formatAmount(ticketCostAtWarning) });
 
@@ -67,14 +71,16 @@ test("TC-30 Status budżetu zmienia się w progach 90% i 100% @logged", async ({
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Budżet ma status ostrzeżenia.
   await test.step("Zweryfikuj ostrzeżenie przy 90%", async () => {
     await expect(costSummary.budget).toContainText(
       `${getExpectedSpentText(spentAtWarning, budget)} (${formatBudgetPercent(spentAtWarning, budget)}%)`,
     );
     await expect(costSummary.budgetStatus).toHaveText(getExpectedBudgetWarningStatus(spentAtWarning, budget));
-    await expect(costSummary.getBudgetWithLevel(BudgetLevel.Warning)).toBeVisible();
+    await expect(costSummary.budget).toHaveAttribute("data-level", BudgetLevel.Warning);
   });
 
+  // when: Użytkownik zmienia wydatek tak, że wydano dokładnie 100% budżetu.
   await sectionTabs.clickTab(TripSectionTab.Expenses);
   await expensesSection.editExpense(ticket.description, { ...ticket, cost: formatAmount(ticketCostAtFullBudget) });
 
@@ -84,11 +90,13 @@ test("TC-30 Status budżetu zmienia się w progach 90% i 100% @logged", async ({
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Budżet nadal ma status ostrzeżenia, nie przekroczenia.
   await test.step("Zweryfikuj ostrzeżenie przy 100%", async () => {
     await expect(costSummary.budgetStatus).toHaveText(getExpectedBudgetWarningStatus(spentAtFullBudget, budget));
-    await expect(costSummary.getBudgetWithLevel(BudgetLevel.Warning)).toBeVisible();
+    await expect(costSummary.budget).toHaveAttribute("data-level", BudgetLevel.Warning);
   });
 
+  // when: Użytkownik zmienia wydatek tak, że budżet jest przekroczony o 1 grosz.
   await sectionTabs.clickTab(TripSectionTab.Expenses);
   await expensesSection.editExpense(ticket.description, { ...ticket, cost: formatAmount(ticketCostOverBudget) });
 
@@ -98,9 +106,10 @@ test("TC-30 Status budżetu zmienia się w progach 90% i 100% @logged", async ({
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Budżet ma status przekroczenia.
   await test.step("Zweryfikuj przekroczenie budżetu", async () => {
     await expect(costSummary.budget).toContainText(getExpectedSpentText(spentOverBudget, budget));
     await expect(costSummary.budgetStatus).toHaveText(getExpectedBudgetExceededStatus(spentOverBudget, budget));
-    await expect(costSummary.getBudgetWithLevel(BudgetLevel.Exceeded)).toBeVisible();
+    await expect(costSummary.budget).toHaveAttribute("data-level", BudgetLevel.Exceeded);
   });
 });

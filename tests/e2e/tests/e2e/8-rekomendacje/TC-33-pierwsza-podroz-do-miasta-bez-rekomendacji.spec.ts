@@ -9,6 +9,7 @@ test("TC-33 Pierwsza podróż do miasta nie ma rekomendacji, a podróż „w pla
   myTripsPage,
   tripsApi,
 }) => {
+  // given: Użytkownik ma podróż „w planie” do nowego miasta z ocenionym posiłkiem, utworzoną przez API.
   const city = prepareUniqueCity("Zamość");
   const firstTrip = prepareTrip({ ...domesticTripData, name: "Zamość plan", destination_city: city });
   const secondTrip = prepareTrip({ ...domesticTripData, name: "Zamość znowu", destination_city: city });
@@ -27,6 +28,7 @@ test("TC-33 Pierwsza podróż do miasta nie ma rekomendacji, a podróż „w pla
   const firstTripId = await tripsApi.createTrip(firstTrip, "planned");
   await tripsApi.createMeal(firstTripId, meal);
 
+  // when: Użytkownik otwiera kosztorys tej podróży.
   await myTripsPage.goto();
   const tripPage = await myTripsPage.clickTripCard(firstTrip.name);
   const { sectionTabs, recommendations } = tripPage;
@@ -37,12 +39,14 @@ test("TC-33 Pierwsza podróż do miasta nie ma rekomendacji, a podróż „w pla
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: To pierwsza podróż do miasta, więc nie ma rekomendacji.
   await test.step("Zweryfikuj brak rekomendacji dla pierwszej podróży", async () => {
     await expect(recommendations.emptyText).toHaveText(expectedFirstTripText);
   });
 
+  // when: Użytkownik otwiera kosztorys drugiej podróży do tego samego miasta.
   const secondTripId = await tripsApi.createTrip(secondTrip, "planned");
-  await tripPage.goto(`/${secondTripId}`);
+  await tripPage.gotoTrip(secondTripId);
 
   await test.step("Zweryfikuj otwarcie drugiej podróży", async () => {
     await expect(tripPage.tripTitle).toHaveText(secondTrip.name);
@@ -50,18 +54,20 @@ test("TC-33 Pierwsza podróż do miasta nie ma rekomendacji, a podróż „w pla
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Podróż „w planie” nie liczy się jako wcześniejsza, więc nadal nie ma rekomendacji.
   await test.step("Zweryfikuj, że podróż „w planie” nie liczy się jako wcześniejsza", async () => {
     await expect(recommendations.emptyText).toHaveText(expectedFirstTripText);
   });
 
-  await tripPage.goto(`/${firstTripId}`);
+  // when: Użytkownik rozpoczyna pierwszą podróż i wraca do kosztorysu drugiej.
+  await tripPage.gotoTrip(firstTripId);
   await tripPage.clickStartTripButton();
 
   await test.step("Zweryfikuj rozpoczęcie pierwszej podróży", async () => {
     await expect(tripPage.tripStatus).toHaveText(TripStatusLabel.InProgress);
   });
 
-  await tripPage.goto(`/${secondTripId}`);
+  await tripPage.gotoTrip(secondTripId);
 
   await test.step("Zweryfikuj ponowne otwarcie drugiej podróży", async () => {
     await expect(tripPage.tripTitle).toHaveText(secondTrip.name);
@@ -69,6 +75,7 @@ test("TC-33 Pierwsza podróż do miasta nie ma rekomendacji, a podróż „w pla
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
+  // then: Pierwsza podróż jest wcześniejszą podróżą, a jej restauracja jest polecana.
   await test.step("Zweryfikuj rekomendacje z podróży „w trakcie”", async () => {
     await expect(recommendations.previousTripsText).toContainText(expectedPreviousTripsText);
     await expect(recommendations.restaurants).toHaveText(expectedRestaurants);

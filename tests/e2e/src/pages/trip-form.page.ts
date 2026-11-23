@@ -1,9 +1,10 @@
-import { TripCharacterId, TripType } from "@_src/enums/trip.enum";
+import { TripType } from "@_src/enums/trip.enum";
 import { PhotoFileModel } from "@_src/models/photo-file.model";
 import { AddTripModel } from "@_src/models/trip.model";
 import { BasePage } from "@_src/pages/base.page";
 import { MyTripsPage } from "@_src/pages/my-trips.page";
 import { TripPage } from "@_src/pages/trip.page";
+import { formatFormBudget } from "@_src/utils/money.util";
 import { step } from "@_src/utils/step.decorator";
 import { ConfirmDialogView } from "@_src/views/confirm-dialog.view";
 import { Locator, Page } from "@playwright/test";
@@ -63,7 +64,7 @@ export class TripFormPage extends BasePage {
     this.endDateError = this.page.getByTestId("error-end-date");
     this.typeError = this.page.getByTestId("error-trip-type");
     this.readOnlyText = this.page.getByTestId("trip-form-readonly");
-    this.backToTripLink = this.readOnlyText.getByRole("link", { name: "Wróć do podróży" });
+    this.backToTripLink = this.page.getByTestId("link-back-to-trip");
     this.backLink = this.page.getByTestId("link-back");
     this.photoInput = this.page.getByTestId("input-trip-photo");
     this.photoDayInput = this.page.getByTestId("input-upload-day");
@@ -103,11 +104,7 @@ export class TripFormPage extends BasePage {
     await this.nameInput.fill(trip.name);
     await this.cityInput.fill(trip.destination_city);
     await this.countryInput.fill(trip.destination_country);
-    await this.budgetInput.fill(
-      trip.planned_budget === undefined || trip.planned_budget === null
-        ? ""
-        : String(trip.planned_budget).replace(".", ","),
-    );
+    await this.budgetInput.fill(formatFormBudget(trip.planned_budget));
     await this.startDateInput.fill(trip.start_date);
     await this.endDateInput.fill(trip.end_date);
     await this.typeSelect.selectOption(trip.trip_type);
@@ -144,21 +141,5 @@ export class TripFormPage extends BasePage {
   async clickBackToTripLink(): Promise<TripPage> {
     await this.backToTripLink.click();
     return new TripPage(this.page);
-  }
-
-  @step("Odczytaj wartości formularza podróży")
-  async getFormValues(): Promise<AddTripModel> {
-    const budget = await this.budgetInput.inputValue();
-
-    return {
-      name: await this.nameInput.inputValue(),
-      destination_city: await this.cityInput.inputValue(),
-      destination_country: await this.countryInput.inputValue(),
-      start_date: await this.startDateInput.inputValue(),
-      end_date: await this.endDateInput.inputValue(),
-      trip_type: (await this.typeSelect.inputValue()) as TripType,
-      character_id: Number(await this.characterSelect.inputValue()) as TripCharacterId,
-      planned_budget: budget === "" ? null : Number(budget.replace(",", ".")),
-    };
   }
 }

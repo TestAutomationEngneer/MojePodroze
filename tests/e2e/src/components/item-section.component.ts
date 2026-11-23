@@ -91,17 +91,17 @@ export class ItemSectionComponent {
 
   @step((title: string) => `Kliknij „Edytuj” przy pozycji „${title}”`)
   async clickEditItemButton(title: string): Promise<void> {
-    await this.getItemByTitle(title).getByRole("button", { name: "Edytuj" }).click();
+    await this.getItemByTitle(title).getByTestId(/^btn-edit-/).click();
   }
 
   @step((title: string) => `Kliknij „Kopiuj” przy pozycji „${title}”`)
   async clickCopyItemButton(title: string): Promise<void> {
-    await this.getItemByTitle(title).getByRole("button", { name: "Kopiuj" }).click();
+    await this.getItemByTitle(title).getByTestId(/^btn-copy-/).click();
   }
 
   @step((title: string) => `Kliknij „Usuń” przy pozycji „${title}”`)
   async clickDeleteItemButton(title: string): Promise<ConfirmDialogView> {
-    await this.getItemByTitle(title).getByRole("button", { name: "Usuń" }).click();
+    await this.getItemByTitle(title).getByTestId(/^btn-delete-/).click();
     return new ConfirmDialogView(this.page);
   }
 

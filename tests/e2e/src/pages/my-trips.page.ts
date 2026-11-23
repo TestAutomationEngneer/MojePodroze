@@ -7,7 +7,7 @@ import { BasePage } from "@_src/pages/base.page";
 import { TripFormPage } from "@_src/pages/trip-form.page";
 import { TripPage } from "@_src/pages/trip.page";
 import { step } from "@_src/utils/step.decorator";
-import { parseTripCardData } from "@_src/utils/trip.util";
+import { parseTripMetaText } from "@_src/utils/trip.util";
 import { Locator, Page } from "@playwright/test";
 
 export class MyTripsPage extends BasePage {
@@ -49,17 +49,16 @@ export class MyTripsPage extends BasePage {
     });
   }
 
-  getCardCoverPhoto(tripName: string): Locator {
-    return this.getCardByName(tripName).getByTestId("trip-cover-photo");
+  getCardStatus(tripName: string): Locator {
+    return this.getCardByName(tripName).getByTestId("trip-status");
   }
 
-  async readTripCard(card: Locator): Promise<TripCardModel> {
-    const tripName = (await card.getByRole("heading").textContent()) ?? "";
-    const status = (await card.getByTestId("trip-status").textContent()) ?? "";
-    const cardDetails = parseTripCardData((await card.getByRole("paragraph").textContent()) ?? "");
+  getCardMeta(tripName: string): Locator {
+    return this.getCardByName(tripName).getByRole("paragraph");
+  }
 
-    const tripCard: TripCardModel = { tripName, status, ...cardDetails };
-    return tripCard;
+  getCardCoverPhoto(tripName: string): Locator {
+    return this.getCardByName(tripName).getByTestId("trip-cover-photo");
   }
 
   @step("Kliknij „Nowa podróż”")
@@ -68,17 +67,18 @@ export class MyTripsPage extends BasePage {
     return new TripFormPage(this.page);
   }
 
-  @step((tripName: string) => `Odczytaj kartę podróży „${tripName}”`)
-  async getTripCard(tripName: string): Promise<TripCardModel> {
-    return this.readTripCard(this.getCardByName(tripName));
-  }
-
+  // Migawka całej listy – do porównań, których nie da się wyrazić jednym lokatorem (np. kolejność
+  // kart). Używaj wewnątrz expect(...).toPass(), żeby odczyt był ponawiany.
   @step("Odczytaj wszystkie karty podróży z listy")
   async getAllTripCards(): Promise<TripCardModel[]> {
     const cards: TripCardModel[] = [];
 
     for (const card of await this.tripCards.all()) {
-      cards.push(await this.readTripCard(card));
+      const tripName = (await card.getByRole("heading").textContent()) ?? "";
+      const status = (await card.getByTestId("trip-status").textContent()) ?? "";
+      const meta = parseTripMetaText((await card.getByRole("paragraph").textContent()) ?? "");
+
+      cards.push({ tripName, status, ...meta });
     }
 
     return cards;

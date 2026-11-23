@@ -1,18 +1,22 @@
-import { TripSectionTab } from "@_src/enums/trip.enum";
+import { TRIP_SECTION_TAB_KEYS, TripSectionTab } from "@_src/enums/trip.enum";
 import { step } from "@_src/utils/step.decorator";
 import { Locator, Page } from "@playwright/test";
 
 export class SectionTabsComponent {
-  tabList: Locator;
   tabs: Locator;
+  activeTab: Locator;
 
   constructor(private page: Page) {
-    this.tabList = this.page.getByRole("tablist", { name: "Sekcje podróży" });
-    this.tabs = this.tabList.getByRole("tab");
+    this.tabs = this.page.getByTestId(/^section-tab-/);
+    this.activeTab = this.tabs.and(this.page.getByRole("tab", { selected: true }));
+  }
+
+  getTab(tabName: TripSectionTab): Locator {
+    return this.page.getByTestId(`section-tab-${TRIP_SECTION_TAB_KEYS[tabName]}`);
   }
 
   @step((tabName: TripSectionTab) => `Przejdź do zakładki „${tabName}”`)
   async clickTab(tabName: TripSectionTab): Promise<void> {
-    await this.tabList.getByRole("tab", { name: tabName, exact: true }).click();
+    await this.getTab(tabName).click();
   }
 }

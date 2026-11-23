@@ -17,7 +17,7 @@ export class RecommendationsComponent {
     this.previousTripsText = this.section.getByRole("paragraph").first();
     this.restaurants = this.section.getByTestId(/^rec-restaurant-/);
     this.places = this.section.getByTestId(/^rec-place-/);
-    this.pendingWishlistHeading = this.section.getByRole("heading", { name: "Nie udało się wtedy zobaczyć" });
+    this.pendingWishlistHeading = this.page.getByTestId("rec-pending-wishlist-title");
     this.pendingWishlist = this.section.getByTestId(/^rec-wish-/);
   }
 

@@ -7,15 +7,13 @@ interface Pages {
   myTripsPage: MyTripsPage;
 }
 
+// Fixture'y tworzą page objecty, ale nie otwierają strony. Test sam woła `goto()` po przygotowaniu
+// danych przez API – inaczej strona byłaby otwierana dwa razy (przed danymi i po nich).
 export const pageObjectTest = baseTest.extend<Pages>({
   loginPage: async ({ page }, use) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await use(loginPage);
+    await use(new LoginPage(page));
   },
   myTripsPage: async ({ page }, use) => {
-    const myTripsPage = new MyTripsPage(page);
-    await myTripsPage.goto();
-    await use(myTripsPage);
+    await use(new MyTripsPage(page));
   },
 });

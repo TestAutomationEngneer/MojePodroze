@@ -8,14 +8,12 @@ export class MainMenuComponent {
   logoLink: Locator;
   myTripsTab: Locator;
   statsTab: Locator;
-  activeTab: Locator;
   logoutButton: Locator;
 
   constructor(private page: Page) {
-    this.logoLink = this.page.getByRole("banner").getByRole("link", { name: "Moje podróże" }).first();
+    this.logoLink = this.page.getByTestId("link-logo");
     this.myTripsTab = this.page.getByTestId("nav-trips");
     this.statsTab = this.page.getByTestId("nav-stats");
-    this.activeTab = this.page.getByRole("navigation", { name: "Główna nawigacja" }).locator('[aria-current="page"]');
     this.logoutButton = this.page.getByTestId("btn-logout");
   }
 

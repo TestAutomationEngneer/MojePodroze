@@ -10,6 +10,7 @@ test("TC-14 Zarchiwizowana podróż nie może być edytowana, dopóki jej status
   myTripsPage,
   tripsApi,
 }) => {
+  // given: Użytkownik ma zrealizowaną podróż zagraniczną z posiłkiem, utworzoną przez API.
   const trip = prepareTrip(foreignTripData);
   const expectedReadOnlyNotice = "Podróż jest w archiwum – można ją tylko przeglądać. Aby coś zmienić, cofnij status.";
   const expectedReadOnlyFormText =
@@ -19,10 +20,12 @@ test("TC-14 Zarchiwizowana podróż nie może być edytowana, dopóki jej status
   const tripId = await tripsApi.createTrip(trip, "completed");
   const mealId = await tripsApi.createMeal(tripId, prepareMeal(trip));
 
+  // when: Użytkownik przenosi podróż do archiwum.
   await myTripsPage.goto();
   let tripPage = await myTripsPage.clickTripCard(trip.name);
   await tripPage.clickArchiveButton();
 
+  // then: Podróż jest tylko do odczytu – bez edycji, usuwania i dodawania pozycji w żadnej sekcji.
   await test.step("Zweryfikuj zarchiwizowaną podróż", async () => {
     await expect(tripPage.tripStatus).toHaveText(TripStatusLabel.Archived);
     await expect(tripPage.readOnlyNotice).toHaveText(expectedReadOnlyNotice);
@@ -32,7 +35,7 @@ test("TC-14 Zarchiwizowana podróż nie może być edytowana, dopóki jej status
 
   await tripPage.sectionTabs.clickTab(TripSectionTab.Meals);
 
-  await test.step("Zweryfikuj zawartość zakaładki posiłki, gdy widok podróży jest tylko do odczytu", async () => {
+  await test.step("Zweryfikuj zawartość zakładki Posiłki, gdy widok podróży jest tylko do odczytu", async () => {
     await expect(tripPage.mealsSection.getItem(mealId)).toBeVisible();
     await expect(tripPage.mealsSection.addButton).toBeHidden();
     await expect(tripPage.mealsSection.getEditButton(mealId)).toBeHidden();
@@ -41,21 +44,22 @@ test("TC-14 Zarchiwizowana podróż nie może być edytowana, dopóki jej status
   });
 
   const sectionsWithAddButton = [
-    { tab: TripSectionTab.Plan, addButton: tripPage.planSection.addButton },
-    { tab: TripSectionTab.Flights, addButton: tripPage.flightsSection.addButton },
-    { tab: TripSectionTab.Transport, addButton: tripPage.transportSection.addButton },
-    { tab: TripSectionTab.Places, addButton: tripPage.placesSection.addButton },
-    { tab: TripSectionTab.Expenses, addButton: tripPage.expensesSection.addButton },
-    { tab: TripSectionTab.Wishlist, addButton: tripPage.wishlistSection.addButton },
-    { tab: TripSectionTab.Packing, addButton: tripPage.packingSection.addButton },
-    { tab: TripSectionTab.Diary, addButton: tripPage.diarySection.addButton },
+    { tab: TripSectionTab.Plan, section: tripPage.planSection },
+    { tab: TripSectionTab.Flights, section: tripPage.flightsSection },
+    { tab: TripSectionTab.Transport, section: tripPage.transportSection },
+    { tab: TripSectionTab.Places, section: tripPage.placesSection },
+    { tab: TripSectionTab.Expenses, section: tripPage.expensesSection },
+    { tab: TripSectionTab.Wishlist, section: tripPage.wishlistSection },
+    { tab: TripSectionTab.Packing, section: tripPage.packingSection },
+    { tab: TripSectionTab.Diary, section: tripPage.diarySection },
   ];
 
-  for (const { tab, addButton } of sectionsWithAddButton) {
+  for (const { tab, section } of sectionsWithAddButton) {
     await tripPage.sectionTabs.clickTab(tab);
 
     await test.step(`Zweryfikuj brak możliwości dodawania pozycji w zakładce „${tab}”`, async () => {
-      await expect(addButton).toBeHidden();
+      await expect(section.section, "Sekcja jest wczytana, zanim sprawdzimy brak przycisku").toBeVisible();
+      await expect(section.addButton).toBeHidden();
     });
   }
 
@@ -69,34 +73,38 @@ test("TC-14 Zarchiwizowana podróż nie może być edytowana, dopóki jej status
     }
   });
 
+  // when: Użytkownik wchodzi na adres edycji zarchiwizowanej podróży.
   const tripFormPage = await tripPage.gotoEditForm(tripId);
 
+  // then: Formularz jest zablokowany i proponuje powrót do podróży.
   await test.step("Zweryfikuj blokadę edycji formularza podróży", async () => {
     await expect(tripFormPage.readOnlyText).toContainText(expectedReadOnlyFormText);
     await expect(tripFormPage.backToTripLink).toBeVisible();
   });
 
+  // when: Użytkownik wraca do podróży i cofa jej status.
   tripPage = await tripFormPage.clickBackToTripLink();
   await tripPage.clickRevertStatusButton();
 
+  // then: Podróż jest „zrealizowana” i znowu można ją edytować we wszystkich sekcjach.
   await test.step("Zweryfikuj podróż po cofnięciu statusu z archiwum", async () => {
     await expect(tripPage.tripStatus).toHaveText(TripStatusLabel.Completed);
-    await expect(tripPage.readOnlyNotice).toBeHidden();
     await expect(tripPage.editButton).toBeVisible();
     await expect(tripPage.deleteButton).toBeVisible();
+    await expect(tripPage.readOnlyNotice).toBeHidden();
   });
 
-  for (const { tab, addButton } of sectionsWithAddButton) {
+  for (const { tab, section } of sectionsWithAddButton) {
     await tripPage.sectionTabs.clickTab(tab);
 
     await test.step(`Zweryfikuj możliwość dodawania pozycji w zakładce „${tab}”`, async () => {
-      await expect(addButton).toBeVisible();
+      await expect(section.addButton).toBeVisible();
     });
   }
 
   await tripPage.sectionTabs.clickTab(TripSectionTab.Meals);
 
-  await test.step("Zweryfikuj możliwość edycji pozycji z zakaładki posiłki, po cofnięciu statusu podróży", async () => {
+  await test.step("Zweryfikuj możliwość edycji pozycji z zakładki Posiłki, po cofnięciu statusu podróży", async () => {
     await expect(tripPage.mealsSection.addButton).toBeVisible();
     await expect(tripPage.mealsSection.getEditButton(mealId)).toBeVisible();
     await expect(tripPage.mealsSection.getCopyButton(mealId)).toBeVisible();
@@ -107,8 +115,9 @@ test("TC-14 Zarchiwizowana podróż nie może być edytowana, dopóki jej status
 
   await test.step("Zweryfikuj listę pakowania po cofnięciu z archiwum", async () => {
     await expect(tripPage.packingSection.progress).toHaveText(expectedPackingProgress);
+    await expect(tripPage.packingSection.checkboxes).toHaveCount(defaultPackingItems.length);
 
-     for (const checkbox of await tripPage.packingSection.checkboxes.all()) {
+    for (const checkbox of await tripPage.packingSection.checkboxes.all()) {
       await expect(checkbox).toBeEnabled();
     }
   });

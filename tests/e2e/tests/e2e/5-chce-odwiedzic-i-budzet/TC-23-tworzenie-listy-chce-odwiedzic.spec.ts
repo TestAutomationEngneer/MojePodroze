@@ -9,6 +9,7 @@ test("TC-23 Użytkownik tworzy listę „Chcę odwiedzić” i odhacza zaliczone
   myTripsPage,
   tripsApi,
 }) => {
+  // given: Użytkownik ma podróż krajową z pustą listą „Chcę odwiedzić”, utworzoną przez API.
   const trip = prepareTrip(domesticTripData);
   const basilica: ChecklistItemFormModel = { name: "Bazylika Mariacka", note: "Wejść na wieżę" };
   const fountain: ChecklistItemFormModel = { name: "Fontanna Neptuna" };
@@ -29,8 +30,10 @@ test("TC-23 Użytkownik tworzy listę „Chcę odwiedzić” i odhacza zaliczone
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { wishlistSection } = tripPage;
 
+  // when: Użytkownik otwiera zakładkę „Chcę odwiedzić”.
   await tripPage.sectionTabs.clickTab(TripSectionTab.Wishlist);
 
+  // then: Lista jest pusta, a formularz ma pola miejsca i notatki.
   await test.step("Zweryfikuj pustą listę", async () => {
     await expect(wishlistSection.nameInput).toHaveAccessibleName(expectedNameLabel);
     await expect(wishlistSection.noteInput).toHaveAccessibleName(expectedNoteLabel);
@@ -38,13 +41,16 @@ test("TC-23 Użytkownik tworzy listę „Chcę odwiedzić” i odhacza zaliczone
     await expect(wishlistSection.emptyText).toHaveText(expectedEmptyText);
   });
 
+  // when: Użytkownik klika „Dodaj” bez nazwy.
   await wishlistSection.clickAddButton();
 
+  // then: Lista prosi o nazwę i nic nie dodaje.
   await test.step("Zweryfikuj błąd pustej nazwy", async () => {
     await expect(wishlistSection.addError).toHaveText(expectedNameError);
     await expect(wishlistSection.items).toHaveCount(0);
   });
 
+  // when: Użytkownik dodaje trzy miejsca, jedno z notatką.
   await wishlistSection.addItem(basilica);
 
   await test.step("Zweryfikuj miejsce z notatką", async () => {
@@ -61,44 +67,51 @@ test("TC-23 Użytkownik tworzy listę „Chcę odwiedzić” i odhacza zaliczone
 
   await wishlistSection.addItem(crane);
 
-  await test.step(`Zweryfikuj dodanie „${crane.name}”`, async () => {
-    await expect(wishlistSection.getItemByName(crane.name)).toBeVisible();
-  });
-
+  // then: Na liście są trzy niezaliczone miejsca.
   await test.step("Zweryfikuj trzy miejsca na liście", async () => {
+    await expect(wishlistSection.getItemByName(crane.name)).toBeVisible();
     await expect(wishlistSection.items).toHaveCount(placesCount);
     await expect(wishlistSection.checkboxes).toHaveCount(placesCount);
     await expect(wishlistSection.progress).toHaveText(getExpectedWishlistProgress(0, placesCount));
   });
 
+  // when: Użytkownik odhacza miejsce.
   await wishlistSection.clickCheckbox(basilica.name);
 
-  await test.step("Zweryfikuj odznaczone miejsce", async () => {
+  // then: Miejsce jest zaliczone, a postęp rośnie.
+  await test.step("Zweryfikuj odhaczone miejsce", async () => {
     await expect(wishlistSection.getCheckbox(basilica.name)).toBeChecked();
     await expect(wishlistSection.progress).toHaveText(getExpectedWishlistProgress(1, placesCount));
   });
 
+  // when: Użytkownik odświeża stronę.
   await tripPage.reload();
   await tripPage.sectionTabs.clickTab(TripSectionTab.Wishlist);
 
+  // then: Zaliczenie jest zapisane.
   await test.step("Zweryfikuj zapisany stan po odświeżeniu", async () => {
     await expect(wishlistSection.getCheckbox(basilica.name)).toBeChecked();
     await expect(wishlistSection.progress).toHaveText(getExpectedWishlistProgress(1, placesCount));
   });
 
+  // when: Użytkownik odznacza miejsce.
   await wishlistSection.clickCheckbox(basilica.name);
 
+  // then: Miejsce znowu jest niezaliczone.
   await test.step("Zweryfikuj odznaczenie miejsca", async () => {
-    await expect(wishlistSection.getCheckbox(basilica.name)).not.toBeChecked();
     await expect(wishlistSection.progress).toHaveText(getExpectedWishlistProgress(0, placesCount));
+    await expect(wishlistSection.getCheckbox(basilica.name)).not.toBeChecked();
   });
 
+  // when: Użytkownik zmienia nazwę miejsca.
   await wishlistSection.editItemName(fountain.name, fountainNewName);
 
+  // then: Miejsce ma nową nazwę.
   await test.step("Zweryfikuj zmienioną nazwę", async () => {
     await expect(wishlistSection.getItemByName(fountainNewName)).toBeVisible();
   });
 
+  // when: Użytkownik usuwa miejsce.
   const deleteDialog = await wishlistSection.clickDeleteItemButton(crane.name);
 
   await test.step("Zweryfikuj okno usuwania pozycji", async () => {
@@ -108,15 +121,20 @@ test("TC-23 Użytkownik tworzy listę „Chcę odwiedzić” i odhacza zaliczone
 
   await deleteDialog.clickConfirmButton();
 
+  // then: Miejsca nie ma na liście, a postęp liczy już tylko dwa miejsca.
   await test.step("Zweryfikuj usunięcie miejsca", async () => {
-    await expect(wishlistSection.getItemByName(crane.name)).toBeHidden();
     await expect(wishlistSection.progress).toHaveText(getExpectedWishlistProgress(0, placesCountAfterDelete));
+    await expect(wishlistSection.getItemByName(crane.name)).toBeHidden();
   });
 
+  // when: Użytkownik odhacza wszystkie pozostałe miejsca.
   await wishlistSection.clickCheckbox(basilica.name);
   await wishlistSection.clickCheckbox(fountainNewName);
 
-  await test.step("Zweryfikuj odznaczenie wszystkich miejsc", async () => {
-    await expect(wishlistSection.progress).toHaveText(getExpectedWishlistProgress(placesCountAfterDelete, placesCountAfterDelete));
+  // then: Wszystkie miejsca są zaliczone.
+  await test.step("Zweryfikuj odhaczenie wszystkich miejsc", async () => {
+    await expect(wishlistSection.progress).toHaveText(
+      getExpectedWishlistProgress(placesCountAfterDelete, placesCountAfterDelete),
+    );
   });
 });

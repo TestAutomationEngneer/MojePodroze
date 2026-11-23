@@ -11,6 +11,7 @@ test("TC-24 Użytkownik ustawia, zmienia i usuwa planowany budżet podróży @lo
   tripsApi,
   page,
 }) => {
+  // given: Użytkownik ma podróż z budżetem 5000 zł i jednym posiłkiem, utworzoną przez API.
   const initialBudget = 5000;
   const updatedBudget = 4000.5;
   const emptyBudget = "";
@@ -25,13 +26,17 @@ test("TC-24 Użytkownik ustawia, zmienia i usuwa planowany budżet podróży @lo
 
   const tripId = await tripsApi.createTrip(trip, "planned");
   await tripsApi.createMeal(tripId, meal);
+
+  // when: Użytkownik otwiera szczegóły podróży.
   await myTripsPage.goto();
   const tripPage = await myTripsPage.clickTripCard(trip.name);
 
+  // then: Przegląd pokazuje budżet podróży.
   await test.step("Zweryfikuj budżet w przeglądzie", async () => {
     await expect(tripPage.overviewBudget).toHaveText(formatMoney(initialBudget));
   });
 
+  // when: Użytkownik czyści budżet w edycji podróży.
   const tripFormPage = await tripPage.clickEditButton();
 
   await test.step("Zweryfikuj wczytanie formularza edycji", async () => {
@@ -41,6 +46,7 @@ test("TC-24 Użytkownik ustawia, zmienia i usuwa planowany budżet podróży @lo
   await tripFormPage.fillBudget(emptyBudget);
   await tripFormPage.clickSaveButton();
 
+  // then: Podróż nie ma budżetu, a kosztorys proponuje jego ustawienie.
   await test.step("Zweryfikuj podróż bez budżetu", async () => {
     await expect(tripPage.overviewBudget).toHaveText(expectedNoBudget);
   });
@@ -51,24 +57,30 @@ test("TC-24 Użytkownik ustawia, zmienia i usuwa planowany budżet podróży @lo
     await expect(tripPage.costSummary.budgetStatus).toHaveText(expectedNoBudgetStatus);
   });
 
+  // when: Użytkownik klika link do ustawienia budżetu.
   const budgetFormPage = await tripPage.costSummary.clickSetBudgetLink();
 
+  // then: Otwiera się formularz edycji tej podróży.
   await test.step("Zweryfikuj otwarcie formularza edycji", async () => {
-    await expect(page).toHaveURL(`/podroze/${tripId}/edycja`);
+    await expect(page).toHaveURL(tripPage.getEditUrl(tripId));
     await expect(budgetFormPage.heading).toHaveText(expectedEditFormHeading);
     await expect(budgetFormPage.nameInput).toHaveValue(trip.name);
   });
 
+  // when: Użytkownik wpisuje budżet 0.
   await budgetFormPage.fillBudget(zeroBudget);
   await budgetFormPage.clickSaveButton();
 
+  // then: Formularz odrzuca budżet równy zero.
   await test.step("Zweryfikuj błąd budżetu równego zero", async () => {
     await expect(budgetFormPage.budgetError).toHaveText(expectedBudgetError);
   });
 
+  // when: Użytkownik wpisuje poprawny budżet z groszami.
   await budgetFormPage.fillBudget(String(updatedBudget));
   await budgetFormPage.clickSaveButton();
 
+  // then: Przegląd i kosztorys pokazują nowy budżet i pozostałą kwotę.
   await test.step("Zweryfikuj nowy budżet w przeglądzie", async () => {
     await expect(tripPage.overviewBudget).toHaveText(formatMoney(updatedBudget));
   });

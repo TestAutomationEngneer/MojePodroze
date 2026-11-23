@@ -65,7 +65,7 @@ function BudgetBlock({ budget, tripId, readOnly }: { budget: Budget; tripId: num
           {!readOnly && (
             <>
               {" "}
-              <Link to={`/podroze/${tripId}/edycja`} className={styles.link}>
+              <Link to={`/podroze/${tripId}/edycja`} className={styles.link} data-testid="link-set-budget">
                 Ustaw go w edycji podróży
               </Link>
               .
@@ -262,7 +262,9 @@ export default function CostSummaryPanel({ tripId, readOnly }: Props) {
             <RecommendationList title="Noclegi i atrakcje" items={recs.data.places} testId="rec-place" />
             {recs.data.pending_wishlist.length > 0 && (
               <div className={styles.recGroup}>
-                <h4 className={styles.recTitle}>Nie udało się wtedy zobaczyć</h4>
+                <h4 className={styles.recTitle} data-testid="rec-pending-wishlist-title">
+                  Nie udało się wtedy zobaczyć
+                </h4>
                 <ul className={styles.recList}>
                   {recs.data.pending_wishlist.map((w, index) => (
                     <li key={w.name} data-testid={`rec-wish-${index}`}>

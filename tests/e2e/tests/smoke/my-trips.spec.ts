@@ -1,17 +1,24 @@
 import { expect, test } from "@_src/fixtures/merge.fixture";
+import { mockedCurrentWeather, mockedExchangeRates } from "@_src/test-data/widgets.data";
 
-test("Widok Moje podróże zawiera menu, zakładki i widgety @smoke @logged", async ({ myTripsPage }) => {
+test("Widok Moje podróże zawiera menu, zakładki i widgety @smoke @logged", async ({ myTripsPage, widgetsMock }) => {
+  // given: Użytkownik jest zalogowany, a pogoda i kursy NBP mają stałe odpowiedzi.
   const { mainMenu, statusTabs, weatherWidget, ratesWidget, newTripButton, searchInput } = myTripsPage;
-
   const expectedAppName = "Moje podróże";
   const expectedStatusTabs = ["Wszystkie", "W planie", "W trakcie", "Zrealizowane", "Archiwum"];
   const expectedWeatherTitle = "Pogoda";
   const expectedRatesTitle = "Kursy NBP";
+  await widgetsMock.mockCurrentWeather(mockedCurrentWeather);
+  await widgetsMock.mockExchangeRates(mockedExchangeRates);
 
+  // when: Użytkownik otwiera stronę „Moje podróże”.
+  await myTripsPage.goto();
+
+  // then: Strona ma menu, wyszukiwarkę, zakładki statusów oraz widżety pogody i kursów.
   await test.step("Zweryfikuj menu główne", async () => {
     await expect(mainMenu.logoLink).toBeVisible();
-    await expect(mainMenu.myTripsTab).toBeVisible();
-    await expect(mainMenu.activeTab, `Aktywna zakładka to „${expectedAppName}”`).toHaveText(expectedAppName);
+    await expect(mainMenu.myTripsTab).toContainText(expectedAppName);
+    await expect(mainMenu.myTripsTab, "Aktywna zakładka menu to „Moje podróże”").toHaveAttribute("aria-current", "page");
     await expect(mainMenu.statsTab).toBeVisible();
     await expect(mainMenu.logoutButton).toBeVisible();
   });

@@ -8,7 +8,7 @@ w trakcie wyjazdu. Projekt zaliczeniowy z przedmiotu „Testowanie aplikacji web
 | Backend (API, logika, baza) + testy jednostkowe | **gotowy – etap 1** | Python 3.13, FastAPI, SQLAlchemy 2, Alembic, SQLite, pytest |
 | Testy integracyjne backendu | późniejszy etap (faza 2) | pytest + TestClient, tymczasowa baza SQLite |
 | Frontend (GUI) | w budowie (faza 3) | React + Vite + TypeScript, React Router, CSS Modules + tokeny CSS; styl „Trouvaille” ([docs/design](docs/design/README.md)), WCAG 2.0 AA |
-| Testy E2E | do zrobienia (faza 4) | Playwright (Python) |
+| Testy E2E | w toku (faza 4) – 25 przypadków z `tests/manual` + smoke | Playwright + TypeScript, Page Object (`tests/e2e`) |
 | Jakość kodu | skonfigurowane | Ruff, **SonarQube (lokalnie, Docker)**, GitHub Actions |
 
 **SonarQube jest podpięty do projektu:** backend ma gotową konfigurację analizy statycznej
@@ -339,11 +339,30 @@ pytest --cov --cov-report=html   # raport HTML w backend/htmlcov/
 | Jednostkowe | `tests/unit/infrastructure` | typ `Money`, rozpoznawanie formatu zdjęcia, zapis plików, walidacja schematów, konfiguracja relacji ORM |
 | Integracyjne | `tests/integration` (**późniejszy etap**) | endpointy na prawdziwej bazie SQLite (świeża kopia dla każdego testu, schemat z migracji), izolacja danych użytkowników, upload zdjęć, archiwum, atrapy API pogody i NBP (także ich awaria), migracje, Swagger |
 | Mutacyjne | `mutmut` na `app/domain` | jakość testów jednostkowych domeny (patrz niżej) |
+| E2E | `tests/e2e` (Playwright + TypeScript) | scenariusze z `tests/manual` w przeglądarce: lista podróży, widżety (z mockami Open-Meteo i NBP), formularz i statusy podróży, archiwum, sekcje, kosztorys, rekomendacje (patrz niżej) |
+| Manualne | `tests/manual` | przypadki testowe TC-01…TC-35 z oczekiwanymi wynikami; kolumna „Automat” wskazuje te pokryte E2E |
 
 Testy integracyjne są zaplanowane na późniejszy etap (decyzja 8 w
 `docs/wymagania/opis-aplikacji-i-funkcjonalnosci.md`, plan w `AGENTS.md`, faza 2). Do tego czasu
 próg pokrycia w `backend/pyproject.toml` wynosi 60% (API, serwisy i warstwa bazy nie mają jeszcze
 testów automatycznych); po ich dodaniu wraca do 90%.
+
+### Testy E2E (Playwright)
+
+Wymagają uruchomionej aplikacji (`docker compose up -d --build`) i konta użytkownika testowego,
+którego login i hasło są w `tests/e2e/.env` (wzór: `.env.template`).
+
+```bash
+cd tests/e2e
+npm ci
+npx playwright install chromium   # tylko za pierwszym razem
+npx playwright test               # wszystkie testy (raport: npx playwright show-report)
+npx playwright test --grep "TC-05"   # jeden przypadek testowy
+npm run typecheck                 # sprawdzenie typów TypeScript
+```
+
+Zasady pisania testów (Page Object, selektory, asercje, komentarze given/when/then):
+[tests/e2e/TESTS_CODING_STANDARDS.md](tests/e2e/TESTS_CODING_STANDARDS.md).
 
 ### Testy mutacyjne (mutmut)
 

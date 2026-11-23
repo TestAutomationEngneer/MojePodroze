@@ -52,7 +52,7 @@ export class PlanSectionComponent extends ItemSectionComponent {
     await this.getDayGroup(isoDate)
       .getByRole("listitem")
       .filter({ hasText: place })
-      .getByRole("button", { name: "Usuń" })
+      .getByTestId(/^btn-delete-/)
       .click();
     return new ConfirmDialogView(this.page);
   }

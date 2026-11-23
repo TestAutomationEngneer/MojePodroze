@@ -7,30 +7,38 @@ opierają się testy, są w `tests/manual`.
 
 | Katalog | Zawartość |
 |---|---|
-| `config/` | zmienne środowiskowe (`env.config.ts`), logowanie przed testami (`global.setup.ts`) |
+| `config/` | zmienne środowiskowe i strefa czasowa (`env.config.ts`), ścieżka sesji (`storage-state.config.ts`), logowanie przed testami (`global.setup.ts`) |
 | `src/pages/` | page objecty: ekrany z własnym adresem, dziedziczą po `BasePage` |
 | `src/components/` | części ekranu z własnymi elementami: menu, zakładki, widgety |
 | `src/views/` | formularze i panele bez własnego adresu |
 | `src/fixtures/` | fixture'y; testy importują `test` i `expect` z `merge.fixture.ts` |
 | `src/api/` | klienci API do przygotowania danych testowych |
+| `src/mocks/` | podmiana odpowiedzi API w przeglądarce (`page.route`), np. widżety pogody i kursów |
+| `src/assertions/` | wspólne grupy asercji używane w kilku testach, np. `verifyTripOnList` |
 | `src/enums/` | stałe zestawy wartości, np. etykiety statusów |
 | `src/models/` | interfejsy danych |
 | `src/factories/` | funkcje tworzące losowe dane testowe |
-| `src/test-data/` | stałe dane testowe, np. użytkownik testowy |
-| `src/utils/` | narzędzia, np. dekorator `step` |
+| `src/test-data/` | stałe dane testowe, np. użytkownik testowy, odpowiedzi mocków |
+| `src/utils/` | narzędzia, np. dekorator `step`, formatowanie oczekiwanych wartości |
 | `tests/smoke/` | testy smoke |
 | `tests/e2e/` | testy przypadków testowych z `tests/manual` |
 | `tmp/` | zapisana sesja, plik ignorowany przez gita |
 
 Nazwy plików piszemy w kebab-case z przyrostkiem typu: `my-trips.page.ts`,
-`main-menu.component.ts`, `add-flight.view.ts`, `user.model.ts`, `login.spec.ts`.
+`main-menu.component.ts`, `add-flight.view.ts`, `user.model.ts`, `widgets.mock.ts`,
+`trip.assertions.ts`, `login.spec.ts`.
 
 Plik testu przypadku testowego zaczyna się od jego numeru, a reszta nazwy jest bez polskich znaków:
-`TC-05-podroze-w-grupach-wedlug-statusu.spec.ts`.
+`TC-05-podroze-w-grupach-wedlug-statusu.spec.ts`. Plik z wariantami jednego przypadku ma numer
+przypadku bez numeru wariantu: `TC-10-dodanie-podrozy.spec.ts` (testy TC-10-1 i TC-10-2).
+
+Plików konfiguracyjnych (`playwright.config.ts`) nie importujemy w testach ani w `src/` – wspólne
+stałe trzymamy w `config/`.
 
 ## Nazwy
 
-Kod i identyfikatory są po angielsku. Tytuły testów, nazwy kroków i opisy asercji są po polsku.
+Kod i identyfikatory są po angielsku. Tytuły testów, nazwy kroków, opisy asercji i komentarze
+given/when/then są po polsku.
 
 | Element | Zapis | Przykład |
 |---|---|---|
@@ -38,6 +46,7 @@ Kod i identyfikatory są po angielsku. Tytuły testów, nazwy kroków i opisy as
 | Lokator | camelCase, opisowo | `newTripButton`, `statsTab`, `weatherWidget` |
 | Metoda | camelCase, `czasownikRzeczownik` | `clickStatsTab`, `login` |
 | Oczekiwana wartość | camelCase z przedrostkiem `expected` | `expectedRatesTitle` |
+| Wspólna grupa asercji | `verify…` | `verifyTripDetails` |
 
 Tytuł testu:
 
@@ -62,14 +71,17 @@ test("Powinien dodać podróż", ...);
 
 Kolejność wyboru:
 
-1. `getByTestId`,
+1. `getByTestId` – także z wyrażeniem regularnym dla rodziny elementów, np.
+   `getByTestId(/^status-tab-/)` albo `item.getByTestId(/^btn-edit-/)` (przycisk w wierszu, gdy nie znamy id),
 2. `id`, np. `locator("#menu-toggle")`,
-3. `getByRole` z nazwą.
+3. `getByRole` **bez nazwy** albo z nazwą będącą danymi testu (np. nazwa podróży w nagłówku karty).
 
-Nie używamy selektorów opartych na klasach CSS. Nazwa przycisku nie jest częścią selektora, tylko
-ewentualnej asercji, żeby zmiana napisu nie psuła wszystkich testów używających tego elementu.
+Nie używamy selektorów opartych na klasach CSS. Napis na przycisku, linku, zakładce czy nagłówku
+nie jest częścią selektora, tylko ewentualnej asercji – zmiana napisu nie może psuć wszystkich
+testów, które używają tego elementu. Stan elementu (`aria-current`, `aria-selected`, `data-level`)
+sprawdzamy asercją `toHaveAttribute`, a nie selektorem atrybutu.
 
-Nowy `data-testid` dopisujemy do listy w `docs/design/README.md`.
+Brakujący `data-testid` dodajemy w aplikacji i dopisujemy do listy w `docs/design/README.md`.
 
 ## Page objecty, komponenty i views
 
@@ -80,8 +92,11 @@ Nowy `data-testid` dopisujemy do listy w `docs/design/README.md`.
 | `url` i `goto()` | tak | nie | nie |
 
 * Komponenty są polami page objectu: `myTripsPage.mainMenu`, `myTripsPage.statusTabs`.
-* Page object udostępnia lokatory. Asercje piszemy tylko w testach.
+* Page object udostępnia lokatory. Asercje piszemy w testach albo we wspólnych grupach asercji
+  w `src/assertions/` – nigdy w page objectach.
 * Metoda, która **przechodzi na inny ekran**, zwraca jego page object.
+* Gdy adres ekranu zależy od id, page object ma metodę z parametrem zamiast `goto()`, np.
+  `tripPage.gotoTrip(tripId)`, `tripPage.getUrl(tripId)`.
 
 ```typescript
 // ✅
@@ -107,16 +122,29 @@ await myTripsPage.mainMenu.clickStatsTab();
 const statsPage = new StatsPage(page);
 ```
 
-* Szczegóły techniczne aplikacji ukrywamy w page objecie. Przykład: test używa lokatora
-  `mainMenu.activeTab`.
+* Szczegóły techniczne aplikacji ukrywamy w page objecie. Przykład: test używa
+  `sectionTabs.clickTab(TripSectionTab.Meals)`, a mapowanie na `data-testid` jest w komponencie.
+* Metody odczytujące migawkę (`getAllTripCards`, `getTabs`, `getCostSummary`) służą tylko do
+  porównań, których nie da się wyrazić jednym lokatorem, albo do zapamiętania stanu wyjściowego.
 * Modyfikatory dostępu dodajemy tylko wtedy, gdy są potrzebne, np. `constructor(private page: Page)`.
 
 ## Fixture'y
 
 * Fixture'y tworzymy tylko dla ekranów, od których zaczynają się testy, np. `loginPage`, `myTripsPage`.
+* Fixture'y **nie otwierają strony**. Test woła `goto()` sam, po przygotowaniu danych przez API –
+  dzięki temu strona jest otwierana raz i już z danymi testu.
 * W teście wywoływany jest **jeden** page z fixture'a. Do kolejnych przechodzimy
   przez metody zwracające page objecty.
+* `widgetsMock` podstawia stałe odpowiedzi pogody i kursów NBP (patrz „Zewnętrzne API”).
 * Nowy zestaw fixture'ów dopisujemy w `merge.fixture.ts`.
+
+## Zewnętrzne API
+
+Testy E2E nie zależą od Open-Meteo ani NBP: wynik zmieniałby się przy każdym uruchomieniu, a awaria
+zewnętrznego serwisu wywracałaby testy. Endpointy backendu, które z nich korzystają
+(`/api/weather/current`, `/api/weather/cities`, `/api/exchange-rates`, `/api/exchange-rates/convert`),
+podmieniamy w przeglądarce przez `widgetsMock` (`page.route`) danymi z `src/test-data/widgets.data.ts`.
+Zapis ustawień użytkownika (np. miasta pogody) idzie do prawdziwego backendu.
 
 ## Kroki w raporcie
 
@@ -126,8 +154,8 @@ const statsPage = new StatsPage(page);
 @step("Zaloguj użytkownika")
 async login(loginUserData: LoginUserModel): Promise<MyTripsPage> { ... }
 
-@step((tripName: string) => `Otwórz podróż „${tripName}”`)
-async gotoTrip(tripName: string): Promise<TripPage> { ... }
+@step((tripId: number) => `Otwórz podróż ${tripId}`)
+async gotoTrip(tripId: number): Promise<void> { ... }
 ```
 
 W nazwie kroku nigdy nie umieszczamy loginu ani hasła.
@@ -147,14 +175,40 @@ Akcji w teście nie wrapujemy w `test.step`. Wyjątkiem są długie przypadki te
 
 ## Asercje
 
-Używamy wyłącznie asercji z automatycznym ponawianiem:
+Używamy wyłącznie asercji z automatycznym ponawianiem na lokatorach:
 
 ```typescript
 // ✅
 await expect(newTripButton).toBeVisible();
+await expect(myTripsPage.getCardStatus(tripName)).toHaveText(TripStatusLabel.Planned);
 
-// ❌
+// ❌ odczyt w jednej chwili – jeśli lista jeszcze się nie przerysowała, test porówna stare dane
 expect(await newTripButton.isVisible()).toBe(true);
+const card = await myTripsPage.getTripCard(tripName);
+expect(card.status).toBe(TripStatusLabel.Planned);
+```
+
+Gdy oczekiwanej wartości nie da się sprawdzić jednym lokatorem (np. kolejność kart), odczyt
+i porównanie wkładamy w `expect(...).toPass()`, żeby były ponawiane:
+
+```typescript
+await expect(async () => {
+  const cards = await myTripsPage.getAllTripCards();
+  expect(cards).toEqual(getExpectedCardsOrder(cards));
+}).toPass();
+```
+
+Asercja negatywna (`toBeHidden`, `toHaveCount(0)`, `not.…`) musi mieć **kotwicę**: wcześniej
+w tym samym kroku sprawdzamy coś pozytywnego, co potwierdza, że ekran już się zmienił. Inaczej
+asercja przejdzie, zanim zakładka się wyrenderuje, i niczego nie sprawdzi.
+
+```typescript
+// ✅
+await expect(section.section).toBeVisible();
+await expect(section.addButton).toBeHidden();
+
+// ❌ przejdzie także wtedy, gdy zakładka jeszcze się nie otworzyła
+await expect(section.addButton).toBeHidden();
 ```
 
 Nie używamy `waitForTimeout`.
@@ -169,7 +223,7 @@ Nie używamy `waitForTimeout`.
 | Liczba elementów | `toHaveCount` |
 | Adres i tytuł strony | `toHaveURL`, `toHaveTitle` |
 | Przycisk aktywny lub zablokowany | `toBeEnabled`, `toBeDisabled` |
-| Atrybut | `toHaveAttribute` |
+| Atrybut, stan ARIA, `data-level` | `toHaveAttribute` |
 
 * `expect` przerywa test przy błędzie. `expect.soft` stosujemy przy kilku niezależnych sprawdzeniach.
 * **Testy smoke** sprawdzają, czy główne obszary ekranu są na miejscu: `toBeVisible`, a tekst tylko
@@ -197,8 +251,8 @@ Opis dodajemy tylko wtedy, gdy z samej asercji nie wynika, co jest sprawdzane. J
 oczekiwaną wartość, używa tej samej stałej co asercja:
 
 ```typescript
-// ✅ selektor aktywnej zakładki nic nie mówi czytelnikowi
-await expect(mainMenu.activeTab, `Aktywna zakładka to „${expectedTitle}”`).toHaveText(expectedTitle);
+// ✅ atrybut aria-current nic nie mówi czytelnikowi
+await expect(mainMenu.myTripsTab, "Aktywna zakładka menu to „Moje podróże”").toHaveAttribute("aria-current", "page");
 
 // ✅ data-testid mówi, co jest sprawdzane
 await expect(mainMenu.logoutButton).toBeVisible();
@@ -207,27 +261,39 @@ await expect(mainMenu.logoutButton).toBeVisible();
 await expect(mainMenu.logoutButton, "Przycisk Wyloguj jest widoczny").toBeVisible();
 ```
 
-## Układ testu
+## Układ testu: given / when / then
 
-Test ma kolejno: przygotowanie, akcję i sprawdzenie. Części rozdzielamy pustą linią. Nie dodajemy
-komentarzy `// Arrange`, `// Act`, `// Assert`.
+Test ma kolejno: przygotowanie, akcję i sprawdzenie. Każdą część poprzedza komentarz
+`// given:`, `// when:` albo `// then:` z **najwyżej jednym zdaniem** wyjaśnienia, co się dzieje
+z punktu widzenia użytkownika. Części rozdzielamy pustą linią.
+
+W długich przypadkach testowych (np. TC-05, TC-13, TC-32) para `// when:` / `// then:` powtarza się
+przy każdym kolejnym etapie scenariusza. Krótkie kroki pomocnicze (np. „Zweryfikuj wczytanie
+formularza”) nie potrzebują osobnego komentarza.
 
 ```typescript
-test("TC-10 Tytuł testu @logged", async ({ myTripsPage }) => {
-  const tripData = prepareRandomTrip();
-  const expectedStatus = "W PLANIE";
+test("TC-10-1 Użytkownik dodaje podróż krajową przez formularz @logged", async ({ myTripsPage }) => {
+  // given: Użytkownik jest na liście podróży.
+  const trip = prepareTrip(domesticTripData);
+  await myTripsPage.goto();
 
-  const tripPage = await myTripsPage.createTrip(tripData);
+  // when: Użytkownik wypełnia i zapisuje formularz nowej podróży.
+  const tripFormPage = await myTripsPage.clickNewTripButton();
+  myTripsPage = await tripFormPage.createTrip(trip);
 
-  await test.step("Zweryfikuj utworzoną podróż", async () => {
-    await expect(tripPage.tripStatus).toHaveText(expectedStatus);
+  // then: Podróż jest na liście ze statusem „W planie”.
+  await test.step("Zweryfikuj kartę podróży", async () => {
+    await expect(myTripsPage.getCardStatus(trip.name)).toHaveText(TripStatusLabel.Planned);
   });
 });
 ```
 
 ## Niezależność testów
 
-* Każdy test jest w osobnym pliku. Nie używamy `test.describe.configure({ mode: "serial" })`.
+* Każdy przypadek testowy jest w osobnym pliku. Warianty jednego przypadku (te same kroki, inne
+  dane, np. podróż krajowa i zagraniczna) są w jednym pliku jako pętla po tablicy wariantów
+  – każdy wariant to osobny `test` z własnym numerem w tytule.
+* Nie używamy `test.describe.configure({ mode: "serial" })`.
 * Żaden test nie korzysta z danych utworzonych przez inny test.
 * Testy z `@logged` korzystają z jednego użytkownika testowego, dlatego dane izolujemy unikalnymi
   wartościami. Nazwy i miasta dostają unikalną końcówkę, np. `Kraków-a1b2`.
@@ -236,6 +302,12 @@ test("TC-10 Tytuł testu @logged", async ({ myTripsPage }) => {
   `tripsApi.addTripToCleanup(nazwa)`.
 * Testy uruchamiamy na jednym workerze (`workers: 1`), bo część z nich zmienia wspólny stan
   użytkownika, np. miasto pogody.
+
+## Daty i strefa czasowa
+
+Testy liczą daty („dziś”, „za 30 dni”) w strefie `Europe/Warsaw` – tej samej, którą dostaje
+przeglądarka (`timezoneId`). Ustawia ją `config/env.config.ts` (`process.env.TZ`), więc wyniki nie
+zależą od strefy maszyny, np. runnera CI w UTC.
 
 ## Tagi
 

@@ -5,6 +5,7 @@ import { expect, test } from "@_src/fixtures/merge.fixture";
 import { domesticTripData } from "@_src/test-data/trip.data";
 
 test("TC-31 Kosztorys podróży w archiwum jest tylko do odczytu @logged", async ({ myTripsPage, tripsApi }) => {
+  // given: Użytkownik ma zrealizowaną podróż z budżetem i posiłkiem, utworzoną przez API, i zna jej kosztorys.
   const trip = prepareTrip({ ...domesticTripData, planned_budget: 1000 });
   const expectedReadOnlyNotice = "Podróż jest w archiwum – można ją tylko przeglądać. Aby coś zmienić, cofnij status.";
   const expectedAlbumEmptyText = "Ta podróż nie ma jeszcze zdjęć.";
@@ -16,10 +17,10 @@ test("TC-31 Kosztorys podróży w archiwum jest tylko do odczytu @logged", async
   const { sectionTabs, costSummary, mealsSection } = tripPage;
 
   const costSections = [
-    { tab: TripSectionTab.Transport, addButton: tripPage.transportSection.addButton },
-    { tab: TripSectionTab.Meals, addButton: mealsSection.addButton },
-    { tab: TripSectionTab.Places, addButton: tripPage.placesSection.addButton },
-    { tab: TripSectionTab.Expenses, addButton: tripPage.expensesSection.addButton },
+    { tab: TripSectionTab.Transport, section: tripPage.transportSection },
+    { tab: TripSectionTab.Meals, section: mealsSection },
+    { tab: TripSectionTab.Places, section: tripPage.placesSection },
+    { tab: TripSectionTab.Expenses, section: tripPage.expensesSection },
   ];
 
   await sectionTabs.clickTab(TripSectionTab.Costs);
@@ -30,8 +31,10 @@ test("TC-31 Kosztorys podróży w archiwum jest tylko do odczytu @logged", async
     return costSummary.getCostSummary();
   });
 
+  // when: Użytkownik przenosi podróż do archiwum.
   await tripPage.clickArchiveButton();
 
+  // then: Kosztorys się nie zmienia, a sekcje kosztowe i album są tylko do odczytu.
   await test.step("Zweryfikuj podróż w archiwum", async () => {
     await expect(tripPage.tripStatus).toHaveText(TripStatusLabel.Archived);
     await expect(tripPage.readOnlyNotice).toHaveText(expectedReadOnlyNotice);
@@ -40,10 +43,11 @@ test("TC-31 Kosztorys podróży w archiwum jest tylko do odczytu @logged", async
   await sectionTabs.clickTab(TripSectionTab.Costs);
 
   await test.step("Zweryfikuj, że kosztorys się nie zmienił", async () => {
-    await expect(costSummary.total).toBeVisible();
-
-    const costSummaryAfterArchive = await costSummary.getCostSummary();
-    await expect(costSummaryAfterArchive).toEqual(costSummaryBeforeArchive);
+    await expect(costSummary.total).toHaveText(costSummaryBeforeArchive.total);
+    await expect(costSummary.daily).toHaveText(costSummaryBeforeArchive.daily);
+    await expect(costSummary.rating).toHaveText(costSummaryBeforeArchive.rating);
+    await expect(costSummary.budget).toHaveText(costSummaryBeforeArchive.budget);
+    await expect(costSummary.sectionsTable).toHaveText(costSummaryBeforeArchive.sections);
   });
 
   await sectionTabs.clickTab(TripSectionTab.Overview);
@@ -53,11 +57,12 @@ test("TC-31 Kosztorys podróży w archiwum jest tylko do odczytu @logged", async
     await expect(tripPage.album.addPhotosLink).toBeHidden();
   });
 
-  for (const { tab, addButton } of costSections) {
+  for (const { tab, section } of costSections) {
     await sectionTabs.clickTab(tab);
 
     await test.step(`Zweryfikuj brak dodawania w zakładce „${tab}”`, async () => {
-      await expect(addButton).toBeHidden();
+      await expect(section.section, "Sekcja jest wczytana, zanim sprawdzimy brak przycisku").toBeVisible();
+      await expect(section.addButton).toBeHidden();
     });
   }
 
@@ -70,17 +75,19 @@ test("TC-31 Kosztorys podróży w archiwum jest tylko do odczytu @logged", async
     await expect(mealsSection.getDeleteButton(mealId)).toBeHidden();
   });
 
+  // when: Użytkownik cofa status podróży z archiwum.
   await tripPage.clickRevertStatusButton();
 
+  // then: W sekcjach kosztowych znowu można dodawać i edytować pozycje.
   await test.step("Zweryfikuj status po cofnięciu z archiwum", async () => {
     await expect(tripPage.tripStatus).toHaveText(TripStatusLabel.Completed);
   });
 
-  for (const { tab, addButton } of costSections) {
+  for (const { tab, section } of costSections) {
     await sectionTabs.clickTab(tab);
 
     await test.step(`Zweryfikuj możliwość dodawania pozycji w zakładce „${tab}”`, async () => {
-      await expect(addButton).toBeEnabled();
+      await expect(section.addButton).toBeEnabled();
     });
   }
 

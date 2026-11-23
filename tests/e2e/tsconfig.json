@@ -9,8 +9,7 @@
     "types": ["node"],
     "paths": {
       "@_src/*": ["./src/*"],
-      "@_config/*": ["./config/*"],
-      "@_pw-config": ["./playwright.config.ts"]
+      "@_config/*": ["./config/*"]
     }
   },
   "include": ["**/*.ts"]

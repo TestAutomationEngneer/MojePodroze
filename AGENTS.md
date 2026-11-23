@@ -20,7 +20,7 @@ Opisuje kontekst, zasady, komendy i plan kolejnych faz. **Aktualizuj go razem z 
 | 1 | Backend: API, domena, baza, migracje, testy jednostkowe, Swagger, Docker, Sonar, CI | ✅ gotowe |
 | 2 | Testy integracyjne backendu (API + prawdziwa baza SQLite) | ⏳ późniejszy etap |
 | 3 | Frontend React + Vite (GUI pod Playwright) + Vitest | ⏳ |
-| 4 | Testy E2E (Playwright, Python, Page Object) | ⏳ |
+| 4 | Testy E2E (Playwright + TypeScript, Page Object) w `tests/e2e` | 🟡 w toku – 25 przypadków z `tests/manual` zautomatyzowanych (+ smoke); brakuje TC-08 (awaria API) i izolacji użytkowników |
 | 5 | Dokument scenariuszy testów manualnych | ⏳ |
 | 6 | Testy mutacyjne – przegląd ocalałych mutantów, quality gate Sonara | ⏳ (konfiguracja gotowa) |
 | 7 | Wariant zaawansowany: filtrowanie, pogoda celu, szablony, propozycje statusu, tryb ciemny | ⏳ |
@@ -103,6 +103,8 @@ Zasady obowiązkowe:
 * Testy jednostkowe: bez bazy i sieci, w `tests/unit/`; wartości graniczne (np. 89/90/100/101%)
   i oba kierunki warunków – pod testy mutacyjne.
 * Testy integracyjne: jeszcze nie istnieją – plan i wymagania w fazie 2 (sekcja 6).
+* Testy E2E: `tests/e2e` (Playwright + TypeScript), zasady w `tests/e2e/TESTS_CODING_STANDARDS.md`.
+  Uruchomienie z `tests/e2e`: `npm ci`, `npx playwright test`, sprawdzenie typów `npm run typecheck`.
 * Nazwy testów opisują zachowanie: `test_flight_cannot_be_added_to_domestic_trip`.
 * Znaczniki `unit` / `integration` nadawane automatycznie wg katalogu (`tests/conftest.py`).
 
@@ -178,15 +180,23 @@ gita, w pierwszym commicie – można od niej zacząć:
   `coverage/lcov.info`) i usługa `sonar-scanner-frontend` w `docker-compose.yml`.
 * CI: osobny workflow `.github/workflows/frontend.yml` (lint, Vitest).
 
-### Faza 4 – Testy E2E (Playwright, Python)
+### Faza 4 – Testy E2E (Playwright + TypeScript)
 
-* Katalog `e2e/` z własnym `requirements.txt` (`pytest-playwright`), Page Object w `e2e/pages/`.
-* Środowisko: backend z czystą bazą (`MP_DATABASE_URL` na plik tymczasowy) + frontend; dane
-  przygotowuj przez API (szybciej), a przez GUI tylko testowany scenariusz.
-* Selektory wyłącznie `get_by_test_id`, `get_by_role`, `get_by_label`.
-* Obowiązkowe scenariusze: pełne życie podróży (rejestracja → podróż → lot → przejazd → posiłek →
-  zdjęcie → statusy → archiwum → kosztorys tylko do odczytu); lotu nie da się dodać do podróży
-  krajowej; izolacja dwóch użytkowników; widżet pogody przy awarii API (Playwright `route`).
+* Katalog `tests/e2e/` z własnym `package.json` (`@playwright/test`, TypeScript). Page objecty
+  w `src/pages/`, komponenty w `src/components/`, fixture'y w `src/fixtures/`, mocki w `src/mocks/`.
+  **Obowiązujące zasady: `tests/e2e/TESTS_CODING_STANDARDS.md`** (selektory, asercje z ponawianiem,
+  komentarze given/when/then, warianty przypadków w pętli, fixture'y bez nawigacji).
+* Przypadki testowe są opisane w `tests/manual/` – test E2E ma w tytule ten sam numer TC.
+* Środowisko: aplikacja uruchomiona osobno (`docker compose up -d --build`), użytkownik testowy
+  z `tests/e2e/.env` (wzór `.env.template`); dane przygotowuj przez API (`TripsApi`), a przez GUI
+  tylko testowany scenariusz.
+* Selektory: `getByTestId` (także z regexem), `id`, `getByRole` bez nazwy – napis przycisku nie jest
+  selektorem. Brakujący `data-testid` dodaj we frontendzie i w `docs/design/README.md`.
+* Open-Meteo i NBP podmieniane w przeglądarce (`widgetsMock`, `page.route`) – testy E2E nie łączą się
+  z zewnętrznymi API.
+* Obowiązkowe scenariusze: pełne życie podróży (TC-32 ✅); lotu nie da się dodać do podróży krajowej
+  (TC-12 ✅); izolacja dwóch użytkowników (⏳); widżet pogody i kursów przy awarii API – TC-08,
+  `page.route` z błędem 503 (⏳).
 
 ### Faza 5 – Testy manualne
 

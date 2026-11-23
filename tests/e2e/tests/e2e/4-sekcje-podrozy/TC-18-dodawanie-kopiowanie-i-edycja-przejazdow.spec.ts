@@ -7,7 +7,11 @@ import { domesticTripData } from "@_src/test-data/trip.data";
 import { formatTripCardDate, getTripDayDate } from "@_src/utils/date.util";
 import { formatAmount, formatMoney } from "@_src/utils/money.util";
 
-test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem transportu @logged", async ({ myTripsPage, tripsApi }) => {
+test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem transportu @logged", async ({
+  myTripsPage,
+  tripsApi,
+}) => {
+  // given: Użytkownik ma podróż krajową bez przejazdów, utworzoną przez API.
   const trip = prepareTrip(domesticTripData);
   const day1 = getTripDayDate(trip.start_date, 1);
   const day4 = getTripDayDate(trip.start_date, 4);
@@ -42,7 +46,16 @@ test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem
 
   const expectedEmptyText = "Nie dodano jeszcze żadnego przejazdu.";
   const expectedNewFormTitle = "Nowy przejazd";
-  const expectedTransportMeans = ["Samochód", "Pociąg", "Autobus", "Prom", "Taksówka", "Komunikacja miejska", "Rower", "Inny"];
+  const expectedTransportMeans = [
+    "Samochód",
+    "Pociąg",
+    "Autobus",
+    "Prom",
+    "Taksówka",
+    "Komunikacja miejska",
+    "Rower",
+    "Inny",
+  ];
   const expectedFormError = "Popraw zaznaczone pola.";
   const expectedRouteFromError = "Podaj miejsce wyjazdu.";
   const expectedRouteToError = "Podaj miejsce docelowe.";
@@ -55,6 +68,7 @@ test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem
   const tripPage = await myTripsPage.clickTripCard(trip.name);
   const { transportSection } = tripPage;
 
+  // when: Użytkownik otwiera zakładkę „Transport” i formularz nowego przejazdu.
   await tripPage.sectionTabs.clickTab(TripSectionTab.Transport);
 
   await test.step("Zweryfikuj pustą zakładkę transportu", async () => {
@@ -64,14 +78,17 @@ test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem
 
   await transportSection.clickAddButton();
 
+  // then: Formularz ma listę środków transportu i domyślnie pierwszy dzień podróży.
   await test.step("Zweryfikuj formularz nowego przejazdu", async () => {
     await expect(transportSection.formTitle).toHaveText(expectedNewFormTitle);
     await expect(transportSection.transportMeanOptions).toHaveText(expectedTransportMeans);
     await expect(transportSection.dateInput).toHaveValue(day1);
   });
 
+  // when: Użytkownik zapisuje pusty formularz.
   await transportSection.clickSaveButton();
 
+  // then: Formularz wskazuje brakującą trasę i koszt.
   await test.step("Zweryfikuj błędy pustego formularza", async () => {
     await expect(transportSection.formError).toHaveText(expectedFormError);
     await expect(transportSection.routeFromError).toHaveText(expectedRouteFromError);
@@ -79,9 +96,11 @@ test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem
     await expect(transportSection.costError).toHaveText(expectedCostError);
   });
 
+  // when: Użytkownik zapisuje poprawny przejazd.
   await transportSection.fillForm(transport);
   await transportSection.clickSaveButton();
 
+  // then: Przejazd jest na liście ze środkiem transportu, datą, oceną i kosztem.
   await test.step("Zweryfikuj dodany przejazd", async () => {
     const transportItem = transportSection.getItemByTitle(transportTitle);
 
@@ -92,17 +111,21 @@ test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem
     await expect(transportSection.total).toHaveText(formatMoney(transportCost));
   });
 
+  // when: Użytkownik kopiuje przejazd jako powrót.
   await transportSection.clickCopyItemButton(transportTitle);
   await transportSection.fillForm(returnTransport);
   await transportSection.clickSaveButton();
 
+  // then: Na liście są dwa przejazdy, a suma obejmuje oba.
   await test.step("Zweryfikuj skopiowany przejazd", async () => {
     await expect(transportSection.items).toHaveCount(2);
     await expect(transportSection.total).toHaveText(formatMoney(transportCost + transportCost));
   });
 
+  // when: Użytkownik otwiera edycję przejazdu powrotnego.
   await transportSection.clickEditItemButton(returnTransportTitle);
 
+  // then: Formularz edycji ma wczytane dane przejazdu.
   await test.step("Zweryfikuj formularz edycji przejazdu", async () => {
     await expect(transportSection.formTitle).toHaveText(expectedEditFormTitle);
     await expect(transportSection.selectedTransportMean).toHaveText(returnTransport.transportMean);
@@ -113,17 +136,19 @@ test("TC-18 Użytkownik dodaje, kopiuje i edytuje przejazdy z wybranym środkiem
     await expect(transportSection.ratingSelect).toHaveValue(returnTransport.rating ?? "");
   });
 
+  // when: Użytkownik zmienia wszystkie pola przejazdu.
   await transportSection.fillForm(editedTransport);
   await transportSection.clickSaveButton();
 
+  // then: Na liście jest zmieniony przejazd zamiast powrotu, a suma się aktualizuje.
   await test.step("Zweryfikuj zmieniony przejazd", async () => {
     const editedTransportItem = transportSection.getItemByTitle(editedTransportTitle);
 
-    await expect(transportSection.getItemByTitle(returnTransportTitle)).toBeHidden();
     await expect(editedTransportItem).toContainText(editedTransport.transportMean);
     await expect(editedTransportItem).toContainText(formatTripCardDate(day4));
     await expect(editedTransportItem).toContainText(RatingStars.Three);
     await expect(editedTransportItem).toContainText(formatMoney(editedTransportCost));
     await expect(transportSection.total).toHaveText(formatMoney(transportCost + editedTransportCost));
+    await expect(transportSection.getItemByTitle(returnTransportTitle)).toBeHidden();
   });
 });

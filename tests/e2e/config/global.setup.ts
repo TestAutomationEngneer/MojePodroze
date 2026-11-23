@@ -1,4 +1,4 @@
-import { STORAGE_STATE } from "@_pw-config";
+import { STORAGE_STATE } from "@_config/storage-state.config";
 import { testUser1 } from "@_src/test-data/user.data";
 import { chromium, FullConfig } from "@playwright/test";
 import * as fs from "fs";

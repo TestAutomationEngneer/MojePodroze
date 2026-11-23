@@ -18,6 +18,6 @@ export class TripAlbumComponent {
   }
 
   getDayPhotos(isoDate: string): Locator {
-    return this.getDayGroup(isoDate).getByRole("button", { name: "Powiększ" });
+    return this.getDayGroup(isoDate).getByTestId(/^album-photo-/);
   }
 }

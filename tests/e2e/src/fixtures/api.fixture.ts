@@ -1,4 +1,4 @@
-import { STORAGE_STATE } from "@_pw-config";
+import { STORAGE_STATE } from "@_config/storage-state.config";
 import { TripsApi } from "@_src/api/trips.api";
 import { WidgetsApi } from "@_src/api/widgets.api";
 import { test as baseTest } from "@playwright/test";
